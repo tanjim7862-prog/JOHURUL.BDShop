@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Help functions
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "admin@gms.com";
+    }
+
+    // Products collection rules
+    match /products/{productId} {
+      // Anyone can view products
+      allow read: if true;
+      // Only the verified admin can add, update, or delete products
+      allow write: if isAdmin();
+    }
+
+    // Orders collection rules
+    match /orders/{orderId} {
+      // Customers need to place orders and track their order status without signing in.
+      // Admin can view and edit all orders.
+      allow create: if true;
+      allow read: if true; // Allows tracking lookups by ID
+      allow update, delete: if isAdmin();
+    }
+  }
+}

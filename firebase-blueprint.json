@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Store items collection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "banglaName": { "type": "string" },
+        "description": { "type": "string" },
+        "banglaDescription": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewsCount": { "type": "number" },
+        "stock": { "type": "number" }
+      },
+      "required": ["id", "name", "price", "image", "category", "stock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "E-commerce order model",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerAddress": { "type": "string" },
+        "customerDistrict": { "type": "string" },
+        "customerThana": { "type": "string" },
+        "customerDivision": { "type": "string" },
+        "cartItems": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "status": { "type": "string" },
+        "trackingHistory": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "fbCampaignRef": { "type": "string" }
+      },
+      "required": ["id", "customerName", "customerPhone", "customerAddress", "customerDistrict", "cartItems", "totalAmount", "paymentMethod", "status", "trackingHistory", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Store catalog items"
+    },
+    "/orders/{orderId}": {
+      "schema": "Customer orders history"
+    }
+  }
+}

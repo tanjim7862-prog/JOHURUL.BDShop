@@ -1,0 +1,6 @@
+{
+  "name": "JOHURUL.BDShop",
+  "description": "An e-commerce platform with live order tracking, cash-on-delivery checkout, and an integrated AI Facebook Ad Campaign assistant powered by Gemini 3.5 Flash.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
