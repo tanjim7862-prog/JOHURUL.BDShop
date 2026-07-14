@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Product, Order, OrderStatus } from "../types";
 import { createDefaultTrackingHistory, updateTrackingHistory } from "../data";
+import watchBannerImg from "../assets/images/watch_banner_1784030925146.jpg";
 import { 
   DollarSign, Package, ShoppingBag, TrendingUp, Edit3, Trash2, Plus, 
   X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2
@@ -1317,7 +1318,7 @@ export default function AdminPanel({
                       <button
                         type="button"
                         onClick={() => {
-                          setInputHeroImage("/src/assets/images/watch_banner_1784030925146.jpg");
+                          setInputHeroImage(watchBannerImg);
                         }}
                         className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer"
                         title="Reset to default smartwatch"
