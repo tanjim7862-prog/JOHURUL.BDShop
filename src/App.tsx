@@ -1395,18 +1395,7 @@ export default function App() {
                     </button>
                   </form>
 
-                  <div className="pt-2 border-t border-gray-100 text-[10px] text-gray-400 font-medium space-y-1">
-                    <p>
-                      {lang === "bn" 
-                        ? "* লগইন আইডি: admin@gms.com" 
-                        : "* Login ID: admin@gms.com"}
-                    </p>
-                    <p>
-                      {lang === "bn" 
-                        ? "* পাসওয়ার্ড: ruma7862" 
-                        : "* Password: ruma7862"}
-                    </p>
-                  </div>
+                  {/* Removed visible default login credentials block */}
                 </div>
               </div>
             ) : (
