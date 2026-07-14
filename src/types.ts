@@ -11,6 +11,7 @@ export interface Product {
   rating: number;
   reviewsCount: number;
   stock: number;
+  supplierShop?: string;
 }
 
 export enum OrderStatus {

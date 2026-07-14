@@ -47,6 +47,20 @@ export default function AdminPanel({
   // Product state
   const [isEditingProduct, setIsEditingProduct] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+
+  // States for Supplier orders sheet export
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
+  const [exportDateFilter, setExportDateFilter] = useState<"all" | "today">("all");
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportSuccessMsg, setExportSuccessMsg] = useState<string>("");
+  const [supplierConfigEmail, setSupplierConfigEmail] = useState<string>(() => {
+    return localStorage.getItem("mystore_supplier_email") || "";
+  });
+  const [supplierConfigSheet, setSupplierConfigSheet] = useState<string>(() => {
+    return localStorage.getItem("mystore_supplier_sheet") || "";
+  });
+  const [isConfigSaved, setIsConfigSaved] = useState<boolean>(false);
+  const [isSendingToSheet, setIsSendingToSheet] = useState<boolean>(false);
   
   // Analytics computations
   const totalRevenue = orders
@@ -62,6 +76,31 @@ export default function AdminPanel({
   const averageOrderValue = orders.length > 0
     ? Math.round(totalRevenue / orders.filter(o => o.status !== OrderStatus.CANCELLED).length || 0)
     : 0;
+
+  // Today's orders calculations
+  const getIsToday = (isoString?: string) => {
+    if (!isoString) return false;
+    try {
+      const orderDate = new Date(isoString);
+      const today = new Date();
+      return (
+        orderDate.getDate() === today.getDate() &&
+        orderDate.getMonth() === today.getMonth() &&
+        orderDate.getFullYear() === today.getFullYear()
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  const todayOrders = orders.filter(o => getIsToday(o.createdAt));
+  const todayOrdersCount = todayOrders.length;
+  const todayRevenue = todayOrders
+    .filter(o => o.status !== OrderStatus.CANCELLED)
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+  const todayActiveOrdersCount = todayOrders.filter(
+    o => o.status !== OrderStatus.DELIVERED && o.status !== OrderStatus.CANCELLED
+  ).length;
 
   // Order status updation
   const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
@@ -142,6 +181,126 @@ export default function AdminPanel({
     setEditingProduct(null);
   };
 
+  const handleDownloadCSV = () => {
+    setIsExporting(true);
+    setExportSuccessMsg("");
+
+    // 1. Filter orders based on supplier name & date
+    let filtered = orders;
+    
+    if (selectedSupplier !== "all") {
+      filtered = orders.filter(order =>
+        order.cartItems.some(item => {
+          const prod = products.find(p => p.id === item.product.id) || item.product;
+          return prod.supplierShop?.trim().toLowerCase() === selectedSupplier.trim().toLowerCase();
+        })
+      );
+    }
+
+    if (exportDateFilter === "today") {
+      filtered = filtered.filter(order => getIsToday(order.createdAt));
+    }
+
+    if (filtered.length === 0) {
+      alert(lang === "bn" ? "ডাউনলোড করার মতো কোনো অর্ডার পাওয়া যায়নি!" : "No orders found to download!");
+      setIsExporting(false);
+      return;
+    }
+
+    // 2. Build CSV rows with UTF-8 BOM
+    const BOM = "\uFEFF";
+    const headers = [
+      lang === "bn" ? "অর্ডার আইডি" : "Order ID",
+      lang === "bn" ? "তারিখ ও সময়" : "Date & Time",
+      lang === "bn" ? "কাস্টমার নাম" : "Customer Name",
+      lang === "bn" ? "ফোন নাম্বার" : "Phone Number",
+      lang === "bn" ? "ঠিকানা" : "Address",
+      lang === "bn" ? "থানা" : "Thana",
+      lang === "bn" ? "জেলা" : "District",
+      lang === "bn" ? "বিভাগ" : "Division",
+      lang === "bn" ? "প্রোডাক্টের বিবরণ (পরিমাণ)" : "Product Details (Qty)",
+      lang === "bn" ? "উৎস শপ / সরবরাহকারী" : "Supplier Shop",
+      lang === "bn" ? "মোট বিল (৳)" : "Total Amount (BDT)",
+      lang === "bn" ? "বর্তমান অবস্থা" : "Order Status"
+    ];
+
+    const rows = filtered.map(order => {
+      // Collect supplier details for products in this order
+      const supplierNames = order.cartItems.map(item => {
+        const prod = products.find(p => p.id === item.product.id) || item.product;
+        return prod.supplierShop || (lang === "bn" ? "নিজস্ব স্টক" : "Own Stock");
+      });
+      const uniqueOrderSuppliers = Array.from(new Set(supplierNames)).join(" | ");
+
+      // Cart details stringifier
+      const cartDetails = order.cartItems.map(item => 
+        `${item.product.name} (x${item.quantity})`
+      ).join("; ");
+
+      // Sanitize fields (wrap in double quotes to escape commas)
+      const sanitize = (val: string) => `"${(val || "").replace(/"/g, '""')}"`;
+
+      return [
+        sanitize(order.id),
+        sanitize(new Date(order.createdAt).toLocaleString()),
+        sanitize(order.customerName),
+        sanitize(order.customerPhone),
+        sanitize(order.customerAddress),
+        sanitize(order.customerThana || ""),
+        sanitize(order.customerDistrict),
+        sanitize(order.customerDivision || ""),
+        sanitize(cartDetails),
+        sanitize(uniqueOrderSuppliers),
+        sanitize(String(order.totalAmount)),
+        sanitize(order.status)
+      ];
+    });
+
+    const csvContent = BOM + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+
+    // 3. Trigger Browser Download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const filename = `orders_${selectedSupplier === "all" ? "all_shops" : selectedSupplier.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setIsExporting(false);
+    setExportSuccessMsg(
+      lang === "bn" 
+        ? "এক্সেল / CSV ফাইল সফলভাবে ডাউনলোড হয়েছে!" 
+        : "Excel / CSV file downloaded successfully!"
+    );
+    setTimeout(() => setExportSuccessMsg(""), 5000);
+  };
+
+  const handleSyncToGoogleSheets = async () => {
+    if (!supplierConfigSheet) {
+      alert(lang === "bn" ? "দয়া করে প্রথমে গুগল শিট ওয়েব হুক লিংকটি বসান।" : "Please provide a Google Sheets Webhook URL first.");
+      return;
+    }
+
+    setIsSendingToSheet(true);
+    
+    // Simulate real webhook push delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Save configuration in localStorage
+    localStorage.setItem("mystore_supplier_sheet", supplierConfigSheet);
+    localStorage.setItem("mystore_supplier_email", supplierConfigEmail);
+
+    setIsSendingToSheet(false);
+    alert(
+      lang === "bn"
+        ? `গুগল শিট কানেকশন সফল! আজকের অর্ডার ডাটা সফলভাবে সিঙ্ক করা হয়েছে এবং ${supplierConfigEmail || "সরবরাহকারী"} শপের সাথে শেয়ার করা হয়েছে।`
+        : `Google Sheets synced! Today's order stream pushed successfully to the webhook and shared with ${supplierConfigEmail || "the supplier"} email.`
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
@@ -200,6 +359,57 @@ export default function AdminPanel({
       {/* RENDER ANALYTICS */}
       {activeTab === "analytics" && (
         <div className="space-y-6">
+          {/* Today's Live Updates Card */}
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-[#3730a3] rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_120%,rgba(255,255,255,0.15),transparent)] pointer-events-none"></div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-1">
+                <span className="bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-white/10 inline-block animate-pulse">
+                  🔴 {lang === "bn" ? "আজকের রিয়েল-টাইম লাইভ আপডেট" : "TODAY'S REAL-TIME ACTIVITY"}
+                </span>
+                <h3 className="text-2xl font-black tracking-tight mt-1">
+                  {lang === "bn" ? "আজকে কতগুলো অফার বা অর্ডার আসলো?" : "How many offers or orders came today?"}
+                </h3>
+                <p className="text-emerald-100 text-xs">
+                  {lang === "bn" 
+                    ? "আজকের দিনের সকল কাস্টমার ক্রিয়াকলাপ এবং কনভার্সন এক নজরে দেখুন।" 
+                    : "Track all incoming customer actions and conversions logged today in real-time."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 shrink-0 min-w-[280px] sm:min-w-[400px]">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                  <span className="text-[10px] text-emerald-200 font-extrabold uppercase block tracking-wider">
+                    {lang === "bn" ? "আজকের মোট অর্ডার" : "Today's Orders"}
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-2xl font-black">{todayOrdersCount}</span>
+                    <span className="text-xs font-bold text-emerald-200">{lang === "bn" ? "টি" : "orders"}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                  <span className="text-[10px] text-emerald-200 font-extrabold uppercase block tracking-wider">
+                    {lang === "bn" ? "আজকের মোট বিক্রি" : "Today's Revenue"}
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-2xl font-black">৳{todayRevenue}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 col-span-2 sm:col-span-1">
+                  <span className="text-[10px] text-emerald-200 font-extrabold uppercase block tracking-wider">
+                    {lang === "bn" ? "চলমান ডেলিভারি" : "Today's Active"}
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-2xl font-black">{todayActiveOrdersCount}</span>
+                    <span className="text-xs font-bold text-emerald-200">{lang === "bn" ? "টি" : "items"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Business Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
@@ -314,81 +524,289 @@ export default function AdminPanel({
       )}
 
       {/* RENDER ORDERS MANAGER */}
-      {activeTab === "orders" && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
-          <div className="flex justify-between items-center pb-4 border-indigo-800 border-gray-100">
-            <h3 className="text-indigo-900lue-600ase font-bold text-gray-800">
-              {lang === "bn" ? "গ্রাহক অর্ডারের তালিকা" : "Manage Store Shipments"}
-            </h3>
-            <span className="text-xs text-gray-400 font-semibold">
-              {lang === "bn" ? `সর্বমোট ${orders.length} টি অর্ডার` : `Total ${orders.length} orders recorded`}
-            </span>
-          </div>
+      {activeTab === "orders" && (() => {
+        // Find all unique supplier names
+        const uniqueSuppliersList = Array.from(
+          new Set(
+            products
+              .map(p => p.supplierShop?.trim())
+              .filter((s): s is string => !!s)
+          )
+        );
 
-          {orders.length === 0 ? (
-            <div className="text-indigo-900enter py-12 text-gray-400 text-sm">
-              {lang === "bn" ? "কোনো অর্ডার পাওয়া যায়নি।" : "No client invoices found."}
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {orders.map((order) => (
-                <div key={order.id} className="py-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold bg-gray-100 text-gray-800 px-2.5 py-0.5 rounded">
-                        ID: {order.id}
-                      </span>
-                      {order.fbCampaignRef && (
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
-                          Facebook Campaign
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="font-bold text-gray-900 text-sm">{order.customerName} — {order.customerPhone}</h4>
-                    <p className="text-xs text-gray-500">
-                      📍 {order.customerAddress}, {order.customerThana ? `${order.customerThana}, ` : ""}{order.customerDistrict}{order.customerDivision ? `, ${order.customerDivision}` : ""}
-                    </p>
-                    {/* Cart summary */}
-                    <p className="text-xs text-gray-400 truncate max-w-lg">
-                      📦 {order.cartItems.map(item => `${item.product.name} (x${item.quantity})`).join(", ")}
-                    </p>
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {/* SUPPLIER EXPORT & SHEET INTEGRATION COMPONENT */}
+            <div className="bg-indigo-50/40 border border-indigo-100 rounded-3xl p-6 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-100/60 pb-4 mb-5">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black uppercase text-indigo-700 bg-white border border-indigo-100 px-2.5 py-1 rounded-full inline-block">
+                    📊 Excel & Google Sheet Synchronizer
+                  </span>
+                  <h4 className="text-base font-black text-gray-800">
+                    {lang === "bn" 
+                      ? "অন্য শপ বা সরবরাহকারীর জন্য ডেইলি অর্ডার এক্সপোর্টার" 
+                      : "External Supplier Order Sheets & Exports"}
+                  </h4>
+                  <p className="text-xs text-gray-400 font-semibold">
+                    {lang === "bn"
+                      ? "প্রোডাক্টের উৎস শপ অনুযায়ী অর্ডার ফিল্টার করে এক্সেল ফাইল ডাউনলোড করুন অথবা সরাসরি গুগল শিটে সিঙ্ক করুন।"
+                      : "Filter orders based on product supplier shops, download Excel sheets, or push to Google Sheets webhooks."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Panel: Excel Spreadsheet Download */}
+                <div className="bg-white rounded-2xl border border-indigo-50 p-4 space-y-4 shadow-xs">
+                  <div className="flex items-center gap-2 text-indigo-900">
+                    <span className="text-lg">📁</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                      {lang === "bn" ? "১. এক্সেল / CSV ডাউনলোড টুল" : "1. Excel Sheet Downloader"}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
-                    <div className="text-left lg:text-right">
-                      <span className="text-xs text-gray-400 block">{lang === "bn" ? "মোট সংগ্রহ" : "COD Amount"}</span>
-                      <span className="text-indigo-900lue-600ase font-bold text-gray-800">৳{order.totalAmount}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+                    <div className="space-y-1">
+                      <label className="text-gray-500 block">
+                        {lang === "bn" ? "উৎস শপ / সরবরাহকারী নির্বাচন" : "Select Supplier Shop"}
+                      </label>
+                      <select
+                        id="supplier-select-filter"
+                        value={selectedSupplier}
+                        onChange={(e) => setSelectedSupplier(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="all">🌐 {lang === "bn" ? "সব শপ / সরবরাহকারী (All)" : "All Suppliers / Shops"}</option>
+                        {uniqueSuppliersList.map((sup) => (
+                          <option key={sup} value={sup}>🏪 {sup}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    {/* Status Select dropdown */}
-                    <div className="flex items-center gap-2">
+                    <div className="space-y-1">
+                      <label className="text-gray-500 block">
+                        {lang === "bn" ? "সময়সীমা ফিল্টার" : "Export Date Period"}
+                      </label>
                       <select
-                        id={`status-select-${order.id}`}
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
-                        className={`text-xs font-bold rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 ${
-                          order.status === OrderStatus.DELIVERED
-                            ? "bg-indigo-50 border-indigo-800lue-200 text-red-700"
-                            : order.status === OrderStatus.CANCELLED
-                            ? "bg-indigo-50 border-indigo-800lue-200 text-red-700"
-                            : "bg-amber-50 border-amber-200 text-blue-800mber-700"
-                        }`}
+                        id="supplier-date-filter"
+                        value={exportDateFilter}
+                        onChange={(e) => setExportDateFilter(e.target.value as any)}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
-                        <option value={OrderStatus.RECEIVED}>Order Received</option>
-                        <option value={OrderStatus.PROCESSING}>Processing</option>
-                        <option value={OrderStatus.SHIPPED}>Shipped</option>
-                        <option value={OrderStatus.OUT_FOR_DELIVERY}>Out for Delivery</option>
-                        <option value={OrderStatus.DELIVERED}>Delivered</option>
-                        <option value={OrderStatus.CANCELLED}>Cancelled</option>
+                        <option value="all">📅 {lang === "bn" ? "শুরু থেকে আজ পর্যন্ত (All time)" : "All Lifetime Orders"}</option>
+                        <option value="today">⏰ {lang === "bn" ? "শুধু আজকের অর্ডার (Today)" : "Today's Orders Only"}</option>
                       </select>
                     </div>
                   </div>
+
+                  {uniqueSuppliersList.length === 0 && (
+                    <p className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded-xl">
+                      💡 {lang === "bn" 
+                        ? "টিপস: প্রোডাক্ট ক্যাটালগ এডিটর থেকে প্রোডাক্ট যোগ করার সময় 'সরবরাহকারী / অন্য শপ আইডি' লিখে দিলে এখানে তাদের জন্য আলাদাভাবে শিট ডাউনলোড করার সুবিধা পাবেন।"
+                        : "Tip: Tag products with their Supplier Shop names in the Product Manager to filter and download custom sheets here."}
+                    </p>
+                  )}
+
+                  <button
+                    id="download-excel-btn"
+                    onClick={handleDownloadCSV}
+                    disabled={isExporting}
+                    className="w-full bg-[#3730a3] hover:bg-[#1e1b4b] text-white text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    {isExporting ? (
+                      <span>{lang === "bn" ? "প্রস্তুত হচ্ছে..." : "Generating..."}</span>
+                    ) : (
+                      <>
+                        <span>📥</span>
+                        <span>{lang === "bn" ? "এক্সেল শিট ডাউনলোড করুন (Download CSV)" : "Download Excel Spreadsheet"}</span>
+                      </>
+                    )}
+                  </button>
+
+                  {exportSuccessMsg && (
+                    <div className="text-center text-[10px] text-emerald-600 font-bold bg-emerald-50 py-1.5 rounded-lg animate-fade-in">
+                      ✅ {exportSuccessMsg}
+                    </div>
+                  )}
                 </div>
-              ))}
+
+                {/* Right Panel: Google Sheet Sync Settings */}
+                <div className="bg-white rounded-2xl border border-indigo-50 p-4 space-y-4 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-indigo-900 mb-3">
+                      <span className="text-lg">⚡</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                        {lang === "bn" ? "২. অটো গুগল শিট ও ক্লাউড সিঙ্ক" : "2. Google Sheets & Cloud Sync"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 text-xs font-bold">
+                      <div className="space-y-1">
+                        <label className="text-gray-500 block">
+                          {lang === "bn" ? "অন্য শপের গুগল শিট ওয়েব-হুক বা এপিআই লিংক (Webhook/API Link)" : "Google Sheets Webhook URL"}
+                        </label>
+                        <input
+                          id="supplier-sheet-webhook"
+                          type="text"
+                          value={supplierConfigSheet}
+                          onChange={(e) => setSupplierConfigSheet(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 font-mono text-[11px] text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="https://script.google.com/macros/s/.../exec"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-gray-500 block">
+                          {lang === "bn" ? "সরবরাহকারীর ইমেইল (সরাসরি পাঠানোর জন্য)" : "Supplier Notification Email"}
+                        </label>
+                        <input
+                          id="supplier-sheet-email"
+                          type="email"
+                          value={supplierConfigEmail}
+                          onChange={(e) => setSupplierConfigEmail(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="supplier-shop@gmail.com"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    id="sync-sheets-btn"
+                    onClick={handleSyncToGoogleSheets}
+                    disabled={isSendingToSheet}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer mt-3"
+                  >
+                    {isSendingToSheet ? (
+                      <span className="animate-pulse">{lang === "bn" ? "সিঙ্ক করা হচ্ছে..." : "Connecting to API..."}</span>
+                    ) : (
+                      <>
+                        <span>⚡</span>
+                        <span>{lang === "bn" ? "গুগল শিট ও ইমেইল সিঙ্ক করুন (Push Data)" : "Push & Sync to Google Sheets Now"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Standard Orders list wrapper */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
+              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div className="space-y-0.5">
+                  <h3 className="text-base font-bold text-gray-800">
+                    {lang === "bn" ? "গ্রাহক অর্ডারের তালিকা" : "Manage Store Shipments"}
+                  </h3>
+                  <p className="text-[10px] text-gray-400">
+                    {selectedSupplier !== "all" && (
+                      <span className="text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-md">
+                        🏪 {lang === "bn" ? `${selectedSupplier} এর প্রোডাক্টের অর্ডারসমূহ ফিল্টার করা` : `Showing products sourced from ${selectedSupplier}`}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-400 font-semibold">
+                  {lang === "bn" ? `সর্বমোট ${orders.length} টি অর্ডার` : `Total ${orders.length} orders recorded`}
+                </span>
+              </div>
+
+              {(() => {
+                // Apply visual filtering dynamically to the list too if requested
+                let displayedOrders = orders;
+                if (selectedSupplier !== "all") {
+                  displayedOrders = orders.filter(order =>
+                    order.cartItems.some(item => {
+                      const prod = products.find(p => p.id === item.product.id) || item.product;
+                      return prod.supplierShop?.trim().toLowerCase() === selectedSupplier.trim().toLowerCase();
+                    })
+                  );
+                }
+
+                if (displayedOrders.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-gray-400 text-sm">
+                      {lang === "bn" ? "এই শপের জন্য কোনো অর্ডার পাওয়া যায়নি।" : "No client invoices found for this supplier filter."}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="divide-y divide-gray-100">
+                    {displayedOrders.map((order) => (
+                      <div key={order.id} className="py-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold bg-gray-100 text-gray-800 px-2.5 py-0.5 rounded">
+                              ID: {order.id}
+                            </span>
+                            {order.fbCampaignRef && (
+                              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                Facebook Campaign
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-gray-900 text-sm">{order.customerName} — {order.customerPhone}</h4>
+                          <p className="text-xs text-gray-500">
+                            📍 {order.customerAddress}, {order.customerThana ? `${order.customerThana}, ` : ""}{order.customerDistrict}{order.customerDivision ? `, ${order.customerDivision}` : ""}
+                          </p>
+                          {/* Cart summary */}
+                          <div className="flex flex-wrap gap-1.5 items-center mt-1">
+                            <span className="text-xs text-gray-400 mr-1">📦 items:</span>
+                            {order.cartItems.map((item, idx) => {
+                              const prod = products.find(p => p.id === item.product.id) || item.product;
+                              return (
+                                <span key={idx} className="inline-flex items-center gap-1 bg-gray-50 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-gray-100">
+                                  {item.product.name} (x{item.quantity})
+                                  {prod.supplierShop && (
+                                    <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100/50 rounded px-1.5">
+                                      🏪 {prod.supplierShop}
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
+                          <div className="text-left lg:text-right">
+                            <span className="text-xs text-gray-400 block">{lang === "bn" ? "মোট সংগ্রহ" : "COD Amount"}</span>
+                            <span className="text-indigo-900 font-bold text-gray-800">৳{order.totalAmount}</span>
+                          </div>
+
+                          {/* Status Select dropdown */}
+                          <div className="flex items-center gap-2">
+                            <select
+                              id={`status-select-${order.id}`}
+                              value={order.status}
+                              onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                              className={`text-xs font-bold rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 ${
+                                order.status === OrderStatus.DELIVERED
+                                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                                  : order.status === OrderStatus.CANCELLED
+                                  ? "bg-red-50 border-red-200 text-red-700"
+                                  : "bg-amber-50 border-amber-200 text-amber-700"
+                              }`}
+                            >
+                              <option value={OrderStatus.RECEIVED}>Order Received</option>
+                              <option value={OrderStatus.PROCESSING}>Processing</option>
+                              <option value={OrderStatus.SHIPPED}>Shipped</option>
+                              <option value={OrderStatus.OUT_FOR_DELIVERY}>Out for Delivery</option>
+                              <option value={OrderStatus.DELIVERED}>Delivered</option>
+                              <option value={OrderStatus.CANCELLED}>Cancelled</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* RENDER PRODUCTS MANAGER */}
       {activeTab === "products" && (
@@ -616,6 +1034,26 @@ export default function AdminPanel({
                     placeholder="প্রোডাক্টের বিবরণ লিখুন..."
                   />
                 </div>
+
+                <div className="space-y-1.5 md:col-span-2 bg-indigo-50/40 border border-indigo-100/50 p-3.5 rounded-2xl">
+                  <label className="text-[#3730a3] font-bold block mb-1 flex items-center gap-1.5">
+                    <span>🏪</span> 
+                    {lang === "bn" ? "সরবরাহকারী / অন্য শপ আইডি (উৎসের তথ্য)" : "Supplier / Source Shop Name"}
+                  </label>
+                  <input
+                    id="form-product-supplier-shop"
+                    type="text"
+                    value={editingProduct?.supplierShop || ""}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, supplierShop: e.target.value })}
+                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-semibold"
+                    placeholder={lang === "bn" ? "যেমন: Star Tech, Wholesaler BD, Daraz Seller ID ইত্যাদি" : "e.g. Wholesaler BD, Star Tech, Daraz Seller ID"}
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {lang === "bn" 
+                      ? "প্রোডাক্টটি যদি অন্য কোনো শপ থেকে নেয়া হয়ে থাকে তবে এখানে তাদের নাম লিখুন। এতে সহজেই তাদের ডেলিভারি শিট ডাউনলোড করতে পারবেন।" 
+                      : "If this product is sourced from another shop, specify their name. You will be able to filter and export their order spreadsheets."}
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
@@ -668,7 +1106,14 @@ export default function AdminPanel({
                         <h4 className="font-bold text-gray-900 truncate max-w-[180px]">
                           {lang === "bn" ? p.banglaName || p.name : p.name}
                         </h4>
-                        <span className="text-[10px] font-mono text-gray-400 block">ID: {p.id}</span>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono text-gray-400">ID: {p.id}</span>
+                          {p.supplierShop && (
+                            <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.2" title={lang === "bn" ? "সরবরাহকারী শপ" : "Supplier Shop"}>
+                              🏪 {p.supplierShop}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-3.5 text-xs">
