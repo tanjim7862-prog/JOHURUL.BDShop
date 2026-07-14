@@ -1349,7 +1349,7 @@ export default function App() {
                         id="admin-email-input"
                         type="email"
                         required
-                        placeholder="admin@gms.com"
+                        placeholder={lang === "bn" ? "ইমেইল অ্যাড্রেস" : "Email Address"}
                         value={typedEmail}
                         onChange={(e) => setTypedEmail(e.target.value)}
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 outline-none transition-all font-medium"
