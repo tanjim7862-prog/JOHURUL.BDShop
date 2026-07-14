@@ -1790,11 +1790,11 @@ export default function App() {
 
       {/* SECURE CHECKOUT OVERLAY PANEL */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 animate-fade-in flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl border border-gray-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 animate-fade-in flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-gray-100 my-auto">
 
             {/* Header */}
-            <div className="p-5 border-indigo-800 border-gray-100 flex justify-between items-center bg-[#fbfbfb]">
+            <div className="p-5 border-indigo-800 border-gray-100 flex justify-between items-center bg-[#fbfbfb] shrink-0">
               <div className="flex items-center gap-2">
                 <Landmark className="w-5 h-5 text-[#3730a3]" />
                 <h3 className="font-bold text-gray-800 text-sm tracking-wide uppercase">
@@ -1811,7 +1811,7 @@ export default function App() {
             </div>
 
             {/* Body */}
-            <form onSubmit={handlePlaceOrder} className="p-5 space-y-4 text-xs font-medium">
+            <form onSubmit={handlePlaceOrder} className="p-5 space-y-4 text-xs font-medium overflow-y-auto flex-1">
 
               {/* Name */}
               <div className="space-y-1.5">
