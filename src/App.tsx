@@ -218,6 +218,15 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [savedForLater, setSavedForLater] = useState<CartItem[]>(() => {
+    const saved = localStorage.getItem("mystore_saved_for_later");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("mystore_saved_for_later", JSON.stringify(savedForLater));
+  }, [savedForLater]);
+
   // Wishlist and Filter States
   const [wishlist, setWishlist] = useState<string[]>(() => {
     const saved = localStorage.getItem("mystore_wishlist");
@@ -412,6 +421,9 @@ export default function App() {
   const [customerDistrict, setCustomerDistrict] = useState<string>("Dhaka (ঢাকা)");
   const [customerThana, setCustomerThana] = useState<string>("Mirpur (মিরপুর)");
   const [couponCode, setCouponCode] = useState<string>("");
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<"cod" | "online">("cod");
+  const [onlineGatewayType, setOnlineGatewayType] = useState<"bkash" | "nagad" | "rocket">("bkash");
+  const [paymentTransactionId, setPaymentTransactionId] = useState<string>("");
   const [activeCouponNotification, setActiveCouponNotification] = useState<string | null>(null);
 
   const [coupons, setCoupons] = useState<Coupon[]>(() => {
@@ -641,6 +653,51 @@ export default function App() {
     ));
   };
 
+  const handleSaveForLater = (item: CartItem) => {
+    setCart((prevCart) => prevCart.filter((cartItem) => 
+      !(cartItem.product.id === item.product.id && 
+        cartItem.selectedSize === item.selectedSize && 
+        cartItem.selectedColor === item.selectedColor)
+    ));
+    setSavedForLater((prevSaved) => {
+      const exists = prevSaved.some((savedItem) => 
+        savedItem.product.id === item.product.id && 
+        savedItem.selectedSize === item.selectedSize && 
+        savedItem.selectedColor === item.selectedColor
+      );
+      if (exists) return prevSaved;
+      return [...prevSaved, item];
+    });
+  };
+
+  const handleMoveToCart = (item: CartItem) => {
+    setSavedForLater((prevSaved) => prevSaved.filter((savedItem) => 
+      !(savedItem.product.id === item.product.id && 
+        savedItem.selectedSize === item.selectedSize && 
+        savedItem.selectedColor === item.selectedColor)
+    ));
+    setCart((prevCart) => {
+      const existingIdx = prevCart.findIndex((cartItem) => 
+        cartItem.product.id === item.product.id && 
+        cartItem.selectedSize === item.selectedSize && 
+        cartItem.selectedColor === item.selectedColor
+      );
+      if (existingIdx > -1) {
+        return prevCart;
+      } else {
+        return [...prevCart, item];
+      }
+    });
+  };
+
+  const handleRemoveFromSavedForLater = (productId: string, selectedSize?: string, selectedColor?: string) => {
+    setSavedForLater((prevSaved) => prevSaved.filter((savedItem) => 
+      !(savedItem.product.id === productId && 
+        savedItem.selectedSize === selectedSize && 
+        savedItem.selectedColor === selectedColor)
+    ));
+  };
+
   // Cart math
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.price !== undefined ? item.price : (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price)) * item.quantity, 0);
   
@@ -666,11 +723,12 @@ export default function App() {
     }
   }, [matchedCoupon, couponCode, cartSubtotal]);
 
-  // Dhaka delivery is 80 BDT, outside Dhaka is 150 BDT
+  // Dhaka delivery is 80 BDT, outside Dhaka is 150 BDT. Free delivery on orders over 3000 BDT!
   const deliveryCharge = useMemo(() => {
     if (cart.length === 0) return 0;
+    if (cartSubtotal >= 3000) return 0;
     return customerDistrict.toLowerCase().includes("dhaka") ? 80 : 150;
-  }, [customerDistrict, cart]);
+  }, [customerDistrict, cart, cartSubtotal]);
 
   const cartTotal = cartSubtotal - discountAmount + deliveryCharge;
 
@@ -780,6 +838,11 @@ export default function App() {
       return;
     }
 
+    if (checkoutPaymentMethod === "online" && !paymentTransactionId.trim()) {
+      alert(lang === "bn" ? "দয়া করে পেমেন্টের ট্রানজেকশন আইডি দিন!" : "Please enter the payment Transaction ID!");
+      return;
+    }
+
     const orderId = `TRK-${Math.floor(10000 + Math.random() * 90000)}`;
     const urlParams = new URLSearchParams(window.location.search);
     const campaignRef = urlParams.get("ref") || undefined;
@@ -794,7 +857,9 @@ export default function App() {
       customerThana,
       cartItems: [...cart],
       totalAmount: cartTotal,
-      paymentMethod: "cod",
+      paymentMethod: checkoutPaymentMethod,
+      onlineGatewayType: checkoutPaymentMethod === "online" ? onlineGatewayType : undefined,
+      paymentTransactionId: checkoutPaymentMethod === "online" ? paymentTransactionId : undefined,
       status: OrderStatus.RECEIVED,
       trackingHistory: createDefaultTrackingHistory(new Date()),
       createdAt: new Date().toISOString(),
@@ -840,6 +905,14 @@ export default function App() {
       }
     });
     
+    waMessage += `\n*পেমেন্ট পদ্ধতি (Payment):* ${
+      checkoutPaymentMethod === "online" 
+        ? `Manual Online Payment (${onlineGatewayType.toUpperCase()})` 
+        : "Cash on Delivery (ক্যাশ অন ডেলিভারি)"
+    }\n`;
+    if (checkoutPaymentMethod === "online") {
+      waMessage += `*ট্রানজেকশন আইডি (Transaction ID):* ${paymentTransactionId}\n`;
+    }
     waMessage += `\n*ডেলিভারি চার্জ (Delivery):* ৳${deliveryCharge}\n`;
     if (discountAmount > 0) {
       waMessage += `*ডিসকাউন্ট (Discount):* -৳${discountAmount}\n`;
@@ -1691,10 +1764,10 @@ export default function App() {
           <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl border-l border-gray-100">
             
             {/* Header */}
-            <div className="p-5 border-indigo-800 border-gray-100 flex items-center justify-between">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-[#3730a3]" />
-                <h3 className="font-bold text-gray-900 text-indigo-900lue-600ase">
+                <h3 className="font-bold text-gray-900 text-indigo-900">
                   {lang === "bn" ? "আপনার শপিং কার্ট" : "Shopping Basket"}
                 </h3>
                 <span className="bg-[#3730a3]/10 text-[#3730a3] text-xs font-bold px-2 py-0.5 rounded-full">
@@ -1704,7 +1777,7 @@ export default function App() {
               <button
                 id="close-cart-drawer"
                 onClick={() => setIsCartOpen(false)}
-                className="p-1 hover:bg-gray-100 rounded-full"
+                className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1713,13 +1786,13 @@ export default function App() {
             {/* Cart Items List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {cart.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-indigo-900enter space-y-3">
-                  <span className="text-indigo-900lue-600xl">🛒</span>
+                <div className="h-64 flex flex-col items-center justify-center text-center space-y-3">
+                  <span className="text-4xl">🛒</span>
                   <p className="text-gray-500 font-bold">{lang === "bn" ? "আপনার কার্টটি খালি!" : "Your cart is currently empty"}</p>
                   <button
                     id="start-shopping-btn"
                     onClick={() => setIsCartOpen(false)}
-                    className="bg-[#3730a3] text-white font-bold text-xs py-2 px-4 rounded shadow-xs"
+                    className="bg-[#3730a3] text-white font-bold text-xs py-2 px-4 rounded shadow-xs cursor-pointer"
                   >
                     {lang === "bn" ? "কেনাকাটা শুরু করুন" : "Continue Browsing"}
                   </button>
@@ -1763,22 +1836,32 @@ export default function App() {
                           <span className="text-xs text-gray-500 font-bold block mt-1">৳{itemPrice}</span>
                         </div>
 
-                        {/* Quantity selector */}
-                        <div className="flex items-center gap-2 mt-1">
+                        {/* Quantity selector and Save for Later */}
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="flex items-center gap-2">
+                            <button
+                              id={`dec-qty-${itemKey}`}
+                              onClick={() => handleUpdateCartQty(item.product.id, -1, item.selectedSize, item.selectedColor)}
+                              className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3 text-gray-600" />
+                            </button>
+                            <span className="text-xs font-bold text-gray-800 w-4 text-center">{item.quantity}</span>
+                            <button
+                              id={`inc-qty-${itemKey}`}
+                              onClick={() => handleUpdateCartQty(item.product.id, 1, item.selectedSize, item.selectedColor)}
+                              className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3 text-gray-600" />
+                            </button>
+                          </div>
+
                           <button
-                            id={`dec-qty-${itemKey}`}
-                            onClick={() => handleUpdateCartQty(item.product.id, -1, item.selectedSize, item.selectedColor)}
-                            className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md cursor-pointer"
+                            id={`save-later-${itemKey}`}
+                            onClick={() => handleSaveForLater(item)}
+                            className="text-[10px] text-indigo-700 hover:text-[#3730a3] hover:underline font-bold cursor-pointer transition-all"
                           >
-                            <Minus className="w-3 h-3 text-gray-600" />
-                          </button>
-                          <span className="text-xs font-bold text-gray-800 w-4 text-center">{item.quantity}</span>
-                          <button
-                            id={`inc-qty-${itemKey}`}
-                            onClick={() => handleUpdateCartQty(item.product.id, 1, item.selectedSize, item.selectedColor)}
-                            className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3 text-gray-600" />
+                            {lang === "bn" ? "পরে কিনুন" : "Save for later"}
                           </button>
                         </div>
                       </div>
@@ -1787,7 +1870,7 @@ export default function App() {
                       <button
                         id={`remove-item-${itemKey}`}
                         onClick={() => handleRemoveFromCart(item.product.id, item.selectedSize, item.selectedColor)}
-                        className="absolute top-3 right-3 text-gray-400 hover:text-[#3730a3] transition-colors cursor-pointer"
+                        className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                         title="Remove"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1795,6 +1878,79 @@ export default function App() {
                     </div>
                   );
                 })
+              )}
+
+              {/* SAVED FOR LATER SECTION */}
+              {savedForLater.length > 0 && (
+                <div className="pt-6 border-t border-gray-100 mt-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>✨</span>
+                      {lang === "bn" ? `পরে কেনার জন্য সংরক্ষিত (${savedForLater.length})` : `Saved For Later (${savedForLater.length})`}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {savedForLater.map((item) => {
+                      const itemKey = `saved-${item.product.id}-${item.selectedSize || ""}-${item.selectedColor || ""}`;
+                      const itemPrice = item.price !== undefined ? item.price : (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+                      
+                      return (
+                        <div key={itemKey} className="flex gap-4 p-3 bg-indigo-50/20 border border-dashed border-indigo-200/50 rounded-lg relative group">
+                          <img
+                            src={item.product.image}
+                            alt={item.product.name}
+                            className="w-12 h-12 rounded object-cover border border-gray-100 shrink-0 grayscale-[15%]"
+                            referrerPolicy="no-referrer"
+                          />
+
+                          <div className="flex-1 min-w-0 flex flex-col justify-between">
+                            <div>
+                              <h4 className="font-bold text-gray-800 text-xs truncate">
+                                {lang === "bn" ? item.product.banglaName || item.product.name : item.product.name}
+                              </h4>
+                              {(item.selectedSize || item.selectedColor) && (
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {item.selectedSize && (
+                                    <span className="text-[8px] font-bold bg-[#3730a3]/5 text-[#3730a3] px-1 py-0.2 rounded">
+                                      {item.selectedSize}
+                                    </span>
+                                  )}
+                                  {item.selectedColor && (
+                                    <span className="text-[8px] font-bold bg-[#3730a3]/5 text-[#3730a3] px-1 py-0.2 rounded">
+                                      {item.selectedColor}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              <span className="text-xs text-[#3730a3] font-bold block mt-0.5">৳{itemPrice}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 mt-1">
+                              <button
+                                id={`move-to-cart-${itemKey}`}
+                                onClick={() => handleMoveToCart(item)}
+                                className="text-[10px] text-emerald-700 hover:text-emerald-800 hover:underline font-extrabold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3" />
+                                {lang === "bn" ? "কার্টে যোগ করুন" : "Add to Basket"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Remove button */}
+                          <button
+                            id={`remove-saved-${itemKey}`}
+                            onClick={() => handleRemoveFromSavedForLater(item.product.id, item.selectedSize, item.selectedColor)}
+                            className="absolute top-2.5 right-2.5 text-gray-400 hover:text-red-500 cursor-pointer transition-colors"
+                            title="Remove"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -1900,151 +2056,305 @@ export default function App() {
       {/* SECURE CHECKOUT OVERLAY PANEL */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 animate-fade-in flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-gray-100 my-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-gray-100 my-auto">
 
             {/* Header */}
-            <div className="p-5 border-indigo-800 border-gray-100 flex justify-between items-center bg-[#fbfbfb] shrink-0">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-[#fbfbfb] shrink-0">
               <div className="flex items-center gap-2">
                 <Landmark className="w-5 h-5 text-[#3730a3]" />
                 <h3 className="font-bold text-gray-800 text-sm tracking-wide uppercase">
-                  {lang === "bn" ? "ক্যাশ অন ডেলিভারি চেকআউট" : "Express Secure Checkout"}
+                  {lang === "bn" ? "এক্সপ্রেস চেকআউট এবং পেমেন্ট" : "Express Secure Checkout"}
                 </h3>
               </div>
               <button
                 id="close-checkout-modal"
                 onClick={() => setIsCheckoutOpen(false)}
-                className="p-1 hover:bg-gray-200 rounded-full text-gray-500 animate-pulse"
+                className="p-1 hover:bg-gray-200 rounded-full text-gray-500 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Body */}
-            <form onSubmit={handlePlaceOrder} className="p-5 space-y-4 text-xs font-medium overflow-y-auto flex-1">
-
-              {/* Name */}
-              <div className="space-y-1.5">
-                <label className="text-gray-500 font-bold block">{lang === "bn" ? "আপনার নাম *" : "Full Name *"}</label>
-                <input
-                  id="checkout-name-input"
-                  type="text"
-                  required
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-3 text-xs text-gray-800 font-semibold focus:outline-none focus:ring-red-500 focus:ring-[#3730a3] focus:bg-white transition-all"
-                  placeholder={lang === "bn" ? "যেমনঃ তানজিম আহমেদ" : "e.g. Tanzim Ahmed"}
-                />
-              </div>
-
-              {/* Phone number */}
-              <div className="space-y-1.5">
-                <label className="text-gray-500 font-bold block">{lang === "bn" ? "মোবাইল নম্বর *" : "Active Phone Number *"}</label>
-                <input
-                  id="checkout-phone-input"
-                  type="tel"
-                  required
-                  pattern="[0-9+]*"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-3 text-xs text-gray-800 font-bold tracking-wider focus:outline-none focus:ring-red-500 focus:ring-[#3730a3] focus:bg-white transition-all"
-                  placeholder="e.g. 01712345678"
-                />
-              </div>
-
-              {/* Division Select */}
-              <div className="space-y-1.5">
-                <label className="text-gray-500 font-bold block">{lang === "bn" ? "বিভাগ নির্ধারণ করুন *" : "Delivery Division *"}</label>
-                <select
-                  id="checkout-division-select"
-                  value={customerDivision}
-                  onChange={(e) => setCustomerDivision(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-3 text-xs text-gray-800 font-bold focus:outline-none focus:ring-red-500 focus:ring-[#3730a3] focus:bg-white transition-all"
-                >
-                  {BANGLADESH_DIVISIONS.map((div) => (
-                    <option key={div} value={div}>
-                      {div}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* District Select */}
-              <div className="space-y-1.5">
-                <label className="text-gray-500 font-bold block">{lang === "bn" ? "জেলা নির্ধারণ করুন *" : "Delivery District *"}</label>
-                <select
-                  id="checkout-district-select"
-                  value={customerDistrict}
-                  onChange={(e) => setCustomerDistrict(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-3 text-xs text-gray-800 font-bold focus:outline-none focus:ring-red-500 focus:ring-[#3730a3] focus:bg-white transition-all"
-                >
-                  {(DIVISION_TO_DISTRICTS[customerDivision] || []).map((dist) => (
-                    <option key={dist} value={dist}>
-                      {dist}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[10px] text-gray-400 block mt-1">
-                  {lang === "bn" 
-                    ? "* ঢাকা জেলায় ডেলিভারি চার্জ ৮০ টাকা, ঢাকার বাইরে কুরিয়ার চার্জ ১৫০ টাকা।" 
-                    : "* Delivery inside Dhaka: 80 BDT, outside Dhaka: 150 BDT."}
-                </span>
-              </div>
-
-              {/* Thana/Upazila */}
-              <div className="space-y-1.5">
-                <label className="text-gray-500 font-bold block">{lang === "bn" ? "থানা নির্ধারণ করুন *" : "Thana / Upazila *"}</label>
-                <select
-                  id="checkout-thana-input"
-                  required
-                  value={customerThana}
-                  onChange={(e) => setCustomerThana(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-3 text-xs text-gray-800 font-bold focus:outline-none focus:ring-red-500 focus:ring-[#3730a3] focus:bg-white transition-all"
-                >
-                  {(DISTRICT_TO_THANAS[customerDistrict] || []).map((thana) => (
-                    <option key={thana} value={thana}>
-                      {thana}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Full address */}
-              <div className="space-y-1.5">
-                <label className="text-gray-500 font-bold block">{lang === "bn" ? "বিস্তারিত ঠিকানা *" : "Complete Shipping Address *"}</label>
-                <textarea
-                  id="checkout-address-input"
-                  required
-                  rows={2}
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-3 text-xs text-gray-800 font-semibold focus:outline-none focus:ring-red-500 focus:ring-[#3730a3] focus:bg-white resize-none transition-all"
-                  placeholder={lang === "bn" ? "বাড়ি নং, রোড নং, এলাকা, থানা" : "House number, Street, Area, Thana"}
-                />
-              </div>
-
-              {/* Amount Info summary */}
-              <div className="bg-gray-50 border border-gray-100 p-4 rounded flex items-center justify-between">
+            <div className="flex-1 overflow-y-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-100">
+              
+              {/* Left Column: Order Summary & Coupon */}
+              <div className="w-full md:w-1/2 p-5 bg-gray-50/50 flex flex-col justify-between space-y-4">
                 <div>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">{lang === "bn" ? "সর্বমোট সংগ্রহযোগ্য মূল্য" : "Total COD Payable"}</span>
-                  <span className="text-lg font-black text-[#3730a3]">৳{cartTotal}</span>
+                  <h4 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 pb-1 border-b border-gray-100 flex items-center gap-1">
+                    <span>📦</span> {lang === "bn" ? "অর্ডার সারাংশ" : "Order Summary"}
+                  </h4>
+                  <div className="max-h-48 overflow-y-auto space-y-2.5 pr-1">
+                    {cart.map((item) => {
+                      const itemKey = `checkout-summary-${item.product.id}-${item.selectedSize || ""}-${item.selectedColor || ""}`;
+                      const itemPrice = item.price !== undefined ? item.price : (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+                      return (
+                        <div key={itemKey} className="flex gap-2 items-center text-[11px] bg-white p-2 rounded-lg border border-gray-100">
+                          <img src={item.product.image} className="w-8 h-8 rounded object-cover shrink-0 border border-gray-100" referrerPolicy="no-referrer" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-700 truncate">{lang === "bn" ? item.product.banglaName || item.product.name : item.product.name}</p>
+                            <p className="text-[9px] text-gray-400 font-medium">
+                              {item.selectedSize && `${lang === "bn" ? "সাইজ" : "Size"}: ${item.selectedSize}`}
+                              {item.selectedSize && item.selectedColor && " | "}
+                              {item.selectedColor && `${lang === "bn" ? "রঙ" : "Color"}: ${item.selectedColor}`}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-gray-800 block">৳{itemPrice * item.quantity}</span>
+                            <span className="text-[9px] text-gray-400 block">{item.quantity} x ৳{itemPrice}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="inline-block px-2.5 py-1 text-[10px] font-bold bg-[#3730a3]/10 text-[#3730a3] rounded uppercase tracking-wider">
-                    {lang === "bn" ? "হাতে পেয়ে টাকা দিন" : "Pay Cash on Delivery"}
-                  </span>
+
+                <div className="space-y-3 pt-3 border-t border-gray-200/60">
+                  {/* Coupon input right in checkout */}
+                  <div className="space-y-1">
+                    <label className="text-gray-400 font-bold block text-[10px] uppercase tracking-wider">{lang === "bn" ? "কুপন কোড ব্যবহার করুন" : "Have a Promo Code?"}</label>
+                    <div className="flex bg-white border border-gray-200 rounded-lg p-1 overflow-hidden">
+                      <input
+                        id="checkout-coupon-input"
+                        type="text"
+                        placeholder={lang === "bn" ? "কুপন কোড (যেমনঃ FB20)" : "Promo code (try FB20)"}
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        className="w-full bg-transparent border-none text-[10px] font-bold text-gray-800 px-2 py-1.5 outline-none"
+                      />
+                      {couponCode && (
+                        <button
+                          type="button"
+                          onClick={() => setCouponCode("")}
+                          className="p-1 hover:bg-gray-100 text-gray-400 rounded flex items-center justify-center"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {matchedCoupon && cartSubtotal >= matchedCoupon.minPurchase ? (
+                    <p className="text-[10px] text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 border border-emerald-100 p-1.5 rounded">
+                      <span>🎉</span>
+                      <span>{matchedCoupon.code}: -৳{discountAmount} ({lang === "bn" ? "ডিসকাউন্ট সক্রিয়" : "Discount applied"})</span>
+                    </p>
+                  ) : couponCode && matchedCoupon && cartSubtotal < matchedCoupon.minPurchase ? (
+                    <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1 bg-amber-50 border border-amber-100 p-1.5 rounded">
+                      <span>⚠️</span>
+                      <span>{lang === "bn" ? `মিনিমাম ৳${matchedCoupon.minPurchase} প্রয়োজন` : `Min ৳${matchedCoupon.minPurchase} needed`}</span>
+                    </p>
+                  ) : couponCode && !matchedCoupon ? (
+                    <p className="text-[10px] text-red-600 font-bold flex items-center gap-1 bg-red-50 border border-red-100 p-1.5 rounded">
+                      <span>❌</span>
+                      <span>{lang === "bn" ? "কুপনটি সঠিক নয়" : "Invalid coupon"}</span>
+                    </p>
+                  ) : null}
+
+                  {/* Order Pricing Summary */}
+                  <div className="space-y-1.5 text-[11px] font-semibold text-gray-500">
+                    <div className="flex justify-between">
+                      <span>{lang === "bn" ? "সাবটোটাল" : "Subtotal"}</span>
+                      <span className="text-gray-800 font-bold">৳{cartSubtotal}</span>
+                    </div>
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-indigo-900">
+                        <span>{lang === "bn" ? "ডিসকাউন্ট" : "Discount"}</span>
+                        <span className="font-bold">-৳{discountAmount}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>
+                        {lang === "bn" ? "ডেলিভারি চার্জ" : "Shipping Fee"}{" "}
+                        <span className="text-[9px] text-gray-400">({customerDistrict.split(" ")[0]})</span>
+                      </span>
+                      <span className="text-gray-800 font-bold">৳{deliveryCharge}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black text-gray-900 pt-1.5 border-t border-gray-200">
+                      <span>{lang === "bn" ? "সর্বমোট পরিশোধযোগ্য মূল্য" : "Payable Total"}</span>
+                      <span className="text-indigo-900">৳{cartTotal}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Confirm order button */}
-              <button
-                id="checkout-form-submit"
-                type="submit"
-                className="w-full bg-[#3730a3] hover:bg-[#4338ca] text-white font-bold text-sm py-3.5 rounded shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                <span>{lang === "bn" ? "অর্ডার নিশ্চিত করুন (৳ক্যাশ অন ডেলিভারি)" : "Confirm Order & Save Track ID"}</span>
-              </button>
-            </form>
+              {/* Right Column: Checkout Form & Payment Method Selection */}
+              <form onSubmit={handlePlaceOrder} className="w-full md:w-1/2 p-5 space-y-3 flex flex-col justify-between">
+                <div className="space-y-3 max-h-[50vh] md:max-h-none overflow-y-auto pr-1">
+                  
+                  {/* Name */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold block">{lang === "bn" ? "আপনার নাম *" : "Full Name *"}</label>
+                    <input
+                      id="checkout-name-input"
+                      type="text"
+                      required
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#3730a3] focus:bg-white transition-all"
+                      placeholder={lang === "bn" ? "যেমনঃ তানজিম আহমেদ" : "e.g. Tanzim Ahmed"}
+                    />
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold block">{lang === "bn" ? "মোবাইল নম্বর *" : "Phone Number *"}</label>
+                    <input
+                      id="checkout-phone-input"
+                      type="tel"
+                      required
+                      pattern="[0-9+]*"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#3730a3] focus:bg-white transition-all"
+                      placeholder="e.g. 01712345678"
+                    />
+                  </div>
+
+                  {/* division, district, thana grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-gray-500 font-bold block">{lang === "bn" ? "বিভাগ *" : "Division *"}</label>
+                      <select
+                        id="checkout-division-select"
+                        value={customerDivision}
+                        onChange={(e) => setCustomerDivision(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded p-2 text-[11px] text-gray-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#3730a3]"
+                      >
+                        {BANGLADESH_DIVISIONS.map((div) => (
+                          <option key={div} value={div}>{div}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-gray-500 font-bold block">{lang === "bn" ? "জেলা *" : "District *"}</label>
+                      <select
+                        id="checkout-district-select"
+                        value={customerDistrict}
+                        onChange={(e) => setCustomerDistrict(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded p-2 text-[11px] text-gray-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#3730a3]"
+                      >
+                        {(DIVISION_TO_DISTRICTS[customerDivision] || []).map((dist) => (
+                          <option key={dist} value={dist}>{dist}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold block">{lang === "bn" ? "থানা নির্ধারণ করুন *" : "Thana / Upazila *"}</label>
+                    <select
+                      id="checkout-thana-input"
+                      required
+                      value={customerThana}
+                      onChange={(e) => setCustomerThana(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded p-2 text-[11px] text-gray-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#3730a3]"
+                    >
+                      {(DISTRICT_TO_THANAS[customerDistrict] || []).map((thana) => (
+                        <option key={thana} value={thana}>{thana}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Detailed Address */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold block">{lang === "bn" ? "বিস্তারিত ঠিকানা *" : "Complete Address *"}</label>
+                    <textarea
+                      id="checkout-address-input"
+                      required
+                      rows={2}
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#3730a3] focus:bg-white resize-none transition-all"
+                      placeholder={lang === "bn" ? "বাড়ি নং, রোড নং, এলাকা" : "House number, Street, Area"}
+                    />
+                  </div>
+
+                  {/* PAYMENT METHOD SELECTION */}
+                  <div className="space-y-2 pt-1.5 border-t border-gray-100">
+                    <label className="text-gray-500 font-bold block text-[11px]">{lang === "bn" ? "পেমেন্ট পদ্ধতি নির্ধারণ করুন *" : "Select Payment Method *"}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutPaymentMethod("cod")}
+                        className={`p-2 rounded-lg border text-center font-bold cursor-pointer transition-all ${
+                          checkoutPaymentMethod === "cod"
+                            ? "border-[#3730a3] bg-indigo-50/50 text-[#3730a3]"
+                            : "border-gray-200 hover:bg-gray-50 text-gray-600"
+                        }`}
+                      >
+                        <p className="text-xs">💵 {lang === "bn" ? "ক্যাশ অন ডেলিভারি" : "Cash on Delivery"}</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutPaymentMethod("online")}
+                        className={`p-2 rounded-lg border text-center font-bold cursor-pointer transition-all ${
+                          checkoutPaymentMethod === "online"
+                            ? "border-[#3730a3] bg-indigo-50/50 text-[#3730a3]"
+                            : "border-gray-200 hover:bg-gray-50 text-gray-600"
+                        }`}
+                      >
+                        <p className="text-xs">📱 {lang === "bn" ? "মোবাইল পেমেন্ট" : "Mobile Pay"}</p>
+                      </button>
+                    </div>
+
+                    {checkoutPaymentMethod === "online" && (
+                      <div className="bg-indigo-50/30 border border-indigo-100 rounded-lg p-2.5 space-y-2 animate-slide-up">
+                        <p className="text-[10px] text-indigo-950 font-bold leading-relaxed">
+                          {lang === "bn"
+                            ? `⚠️ আমাদের দেওয়া নম্বরে (${whatsappNumber}) সেন্ড মানি করুন। এরপর নিচে পেমেন্ট গেটওয়ে এবং ট্রানজেকশন আইডি প্রদান করুন:`
+                            : `⚠️ Send money to our official number (${whatsappNumber}). Then select gateway and provide Transaction ID:`}
+                        </p>
+                        
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {(["bkash", "nagad", "rocket"] as const).map((gw) => (
+                            <button
+                              type="button"
+                              key={gw}
+                              onClick={() => setOnlineGatewayType(gw)}
+                              className={`py-1 rounded text-[10px] font-black border uppercase text-center cursor-pointer ${
+                                onlineGatewayType === gw
+                                  ? "bg-[#3730a3] text-white border-[#3730a3]"
+                                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                              }`}
+                            >
+                              {gw}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            required
+                            placeholder={lang === "bn" ? "ট্রানজেকশন আইডি (যেমনঃ Trx998X)" : "Transaction ID (e.g. Trx998X)"}
+                            value={paymentTransactionId}
+                            onChange={(e) => setPaymentTransactionId(e.target.value)}
+                            className="w-full bg-white border border-gray-200 rounded px-2.5 py-1.5 text-[11px] font-black tracking-wider text-gray-800 outline-none focus:ring-1 focus:ring-[#3730a3]"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Submit button */}
+                <button
+                  id="checkout-form-submit"
+                  type="submit"
+                  className="w-full bg-[#3730a3] hover:bg-[#4338ca] text-white font-bold text-xs py-3 rounded shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-2 shrink-0"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    {checkoutPaymentMethod === "online"
+                      ? (lang === "bn" ? "পেমেন্টসহ অর্ডার নিশ্চিত করুন" : "Confirm Order with Mobile Payment")
+                      : (lang === "bn" ? "ক্যাশ অন ডেলিভারি অর্ডার নিশ্চিত করুন" : "Confirm Cash on Delivery Order")}
+                  </span>
+                </button>
+              </form>
+            </div>
 
           </div>
         </div>

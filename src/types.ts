@@ -72,7 +72,9 @@ export interface Order {
   customerDivision?: string;
   cartItems: CartItem[];
   totalAmount: number;
-  paymentMethod: "cod" | "card";
+  paymentMethod: "cod" | "online" | "card";
+  onlineGatewayType?: string;
+  paymentTransactionId?: string;
   status: OrderStatus;
   trackingHistory: TrackingStep[];
   createdAt: string;
