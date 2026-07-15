@@ -12,6 +12,9 @@ export interface Product {
   reviewsCount: number;
   stock: number;
   supplierShop?: string;
+  images?: string[]; // Multiple additional landing page images (3-4 images)
+  landingDescription?: string; // Long landing page custom description
+  banglaLandingDescription?: string; // Long landing page custom description in Bangla
 }
 
 export enum OrderStatus {

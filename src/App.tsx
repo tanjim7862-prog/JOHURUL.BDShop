@@ -1620,6 +1620,84 @@ export default function App() {
               </div>
             </div>
 
+            {/* Extended Landing Page Content (Images & Descriptions) */}
+            {(selectedProductDetails.landingDescription || 
+              selectedProductDetails.banglaLandingDescription || 
+              (selectedProductDetails.images && selectedProductDetails.images.filter(img => img).length > 0)) && (
+              <div className="border-t border-gray-100 bg-gray-50/50 p-6 sm:p-8 space-y-8">
+                
+                {/* Visual Section Header */}
+                <div className="text-center space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-[#3730a3] text-xs font-bold uppercase tracking-wider">
+                    <span>✨</span>
+                    {lang === "bn" ? "বিস্তারিত পণ্য পরিচিতি ও গ্যালারি" : "Detailed Presentation & Gallery"}
+                  </div>
+                  <h4 className="text-lg font-black text-gray-900">
+                    {lang === "bn" ? "কেন এই পণ্যটি আপনার জন্য সেরা?" : "Why this is the perfect choice for you?"}
+                  </h4>
+                </div>
+
+                {/* Long Landing Description */}
+                {(selectedProductDetails.landingDescription || selectedProductDetails.banglaLandingDescription) && (
+                  <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-sm leading-relaxed text-gray-600 text-xs sm:text-sm space-y-3">
+                    <p className="whitespace-pre-line">
+                      {lang === "bn" 
+                        ? selectedProductDetails.banglaLandingDescription || selectedProductDetails.landingDescription 
+                        : selectedProductDetails.landingDescription}
+                    </p>
+                  </div>
+                )}
+
+                {/* Grid of Auxiliary Images */}
+                {selectedProductDetails.images && selectedProductDetails.images.filter(img => img).length > 0 && (
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">
+                      {lang === "bn" ? "পণ্যটির বাস্তবসম্মত কিছু চিত্র" : "Product Features & Highlights Showcase"}
+                    </h5>
+                    
+                    {/* List/Grid of images */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {selectedProductDetails.images.filter(img => img).map((imgUrl, i) => (
+                        <div key={i} className="overflow-hidden rounded-2xl border border-gray-100 shadow-sm bg-white aspect-video relative group">
+                          <img 
+                            src={imgUrl} 
+                            alt={`${selectedProductDetails.name} showcase ${i + 1}`} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                            {lang === "bn" ? `বৈশিষ্ট্য ${i + 1}` : `Feature ${i + 1}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sticky Order Action Shortcut inside the Landing section to increase conversions! */}
+                <div className="bg-[#3730a3] rounded-2xl p-6 text-white text-center space-y-4 shadow-xl">
+                  <h5 className="text-sm font-black uppercase tracking-wider">
+                    {lang === "bn" ? "আজই অর্ডার করুন, স্টক সীমিত!" : "Order today, limited stock remaining!"}
+                  </h5>
+                  <p className="text-xs text-indigo-100 max-w-md mx-auto">
+                    {lang === "bn" 
+                      ? "পণ্যটি পেতে নিচে বাটনে ক্লিক করুন এবং আপনার নাম, ঠিকানা ও মোবাইল নম্বর দিয়ে অর্ডার সাবমিট করুন।" 
+                      : "Click below to secure your items. Cash on delivery is fully supported throughout Bangladesh!"}
+                  </p>
+                  <button
+                    onClick={() => {
+                      handleOrderNow(selectedProductDetails);
+                    }}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white text-[#3730a3] hover:bg-gray-50 font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl shadow-lg transition-all cursor-pointer uppercase tracking-wider"
+                  >
+                    <span>🛍️</span>
+                    <span>{lang === "bn" ? "সরাসরি ক্যাশ অন ডেলিভারিতে কিনুন" : "Order Cash on Delivery Now"}</span>
+                  </button>
+                </div>
+
+              </div>
+            )}
+
           </div>
         </div>
       )}

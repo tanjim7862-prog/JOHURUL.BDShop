@@ -4,7 +4,10 @@ import { createDefaultTrackingHistory, updateTrackingHistory } from "../data";
 import watchBannerImg from "../assets/images/watch_banner_1784030925146.jpg";
 import { 
   DollarSign, Package, ShoppingBag, TrendingUp, Edit3, Trash2, Plus, 
-  X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2
+  X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2,
+  LayoutDashboard, Users, CreditCard, Layers, Feather, BookOpen, Image as ImageIcon,
+  Activity, Globe, Truck, MessageSquare, Key, Settings, UserCheck, Menu, ChevronRight,
+  ChevronLeft, Search, FileText, Percent
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -34,7 +37,94 @@ export default function AdminPanel({
   heroImageUrl,
   onChangeHeroImageUrl
 }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "products" | "pixel">("analytics");
+  type AdminTab = 
+    | "analytics"
+    | "orders"
+    | "abandoned"
+    | "customers"
+    | "accounts"
+    | "products"
+    | "categories"
+    | "authors"
+    | "publishers"
+    | "banners"
+    | "stock"
+    | "landing"
+    | "delivery"
+    | "sms"
+    | "roles"
+    | "users";
+
+  const [activeTab, setActiveTab] = useState<AdminTab>("orders");
+  const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState<boolean>(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState<string>("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+
+  // Mock states for extra systems to match Kamiab Prokashon image
+  const [abandonedOrders, setAbandonedOrders] = useState([
+    { id: "KP-AB-9831", name: "Masumbillah", phone: "01716554699", items: "1x Smartwatch Elite (৳ 790)", amount: 790, time: "30 mins ago", status: "Active" },
+    { id: "KP-AB-9828", name: "Obaydul Huqe Huqe", phone: "01752500171", items: "1x Premium Leather Strap (৳ 500)", amount: 500, time: "2 hours ago", status: "Active" },
+    { id: "KP-AB-9812", name: "Farhan Tanvir", phone: "01823909192", items: "1x Touchscreen Smartband (৳ 1200)", amount: 1200, time: "Yesterday", status: "Recovered" },
+    { id: "KP-AB-9801", name: "Sabina Yasmin", phone: "01911223344", items: "2x Wireless Buds (৳ 1600)", amount: 1600, time: "3 days ago", status: "Active" }
+  ]);
+
+  const [categories, setCategories] = useState([
+    { id: "cat-1", name: "Smartwatches", count: 8, slug: "smartwatch" },
+    { id: "cat-2", name: "Earbuds & Audio", count: 5, slug: "audio" },
+    { id: "cat-3", name: "Fast Chargers", count: 4, slug: "charger" },
+    { id: "cat-4", name: "Screen Protectors", count: 3, slug: "protector" }
+  ]);
+  const [newCatName, setNewCatName] = useState("");
+
+  const [authors, setAuthors] = useState([
+    { id: "auth-1", name: "Afnan Mahmud", bio: "Lead tech reviewer and curator of Johurul BDShop landing templates.", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" },
+    { id: "auth-2", name: "Johurul Islam", bio: "Founder of JB Shop who inspects and warrants every electronic smartwatch import.", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150" }
+  ]);
+  const [newAuthorName, setNewAuthorName] = useState("");
+  const [newAuthorBio, setNewAuthorBio] = useState("");
+
+  const [publishers, setPublishers] = useState([
+    { id: "pub-1", name: "Johurul Smart Sourcing Ltd", location: "Mymensingh HQ", productsCount: 15 },
+    { id: "pub-2", name: "Kamiab Import House", location: "Banglabazar, Dhaka", productsCount: 9 },
+    { id: "pub-3", name: "Afnan Distribution BD", location: "Motijheel, Dhaka", productsCount: 6 }
+  ]);
+  const [newPubName, setNewPubName] = useState("");
+  const [newPubLocation, setNewPubLocation] = useState("");
+
+  const [deliveryConfig, setDeliveryConfig] = useState({
+    insideDhaka: 60,
+    outsideDhaka: 120,
+    provider: "Pathao",
+  });
+
+  const [smsTemplate, setSmsTemplate] = useState("প্রিয় [CUSTOMER_NAME], Johurul BDShop-এ আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে! অর্ডার আইডি: [ORDER_ID]। মোট মূল্য: ৳[TOTAL_AMOUNT]। ধন্যবাদ!");
+  const [smsHistory, setSmsHistory] = useState([
+    { id: "SMS-101", recipient: "01716554699", message: "প্রিয় Masumbillah, আপনার অর্ডারটি সফলভাবে ডেলিভারি দেওয়া হয়েছে!", time: "Today, 11:20 AM", status: "Sent" },
+    { id: "SMS-102", recipient: "01752500171", message: "প্রিয় Obaydul, আপনার অর্ডারটি কুরিয়ারে বুকিং করা হয়েছে!", time: "Today, 09:45 AM", status: "Sent" }
+  ]);
+
+  const [roles, setRoles] = useState([
+    { id: "role-1", name: "Super Admin", usersCount: 1, permissions: ["all"] },
+    { id: "role-2", name: "Sales Manager", usersCount: 2, permissions: ["orders", "customers"] },
+    { id: "role-3", name: "Delivery Partner", usersCount: 1, permissions: ["orders", "delivery"] }
+  ]);
+
+  const [adminUsers, setAdminUsers] = useState([
+    { email: "admin@gms.com", role: "Super Admin", status: "Active", lastLogin: "Just now" },
+    { email: "manager@gms.com", role: "Sales Manager", status: "Active", lastLogin: "2 hours ago" },
+    { email: "operator@gms.com", role: "Delivery Partner", status: "Active", lastLogin: "Yesterday" }
+  ]);
+  const [newStaffEmail, setNewStaffEmail] = useState("");
+  const [newStaffRole, setNewStaffRole] = useState("Sales Manager");
+
+  const [expenses, setExpenses] = useState([
+    { id: "E-401", description: "Meta Facebook Ads Boost", amount: 6500, category: "Marketing", date: "2026-07-14" },
+    { id: "E-402", description: "Courier Packaging Bubblewrap", amount: 1200, category: "Operations", date: "2026-07-12" },
+    { id: "E-403", description: "Office Wifi Internet Bill", amount: 950, category: "Utilities", date: "2026-07-10" }
+  ]);
+  const [newExpenseDesc, setNewExpenseDesc] = useState("");
+  const [newExpenseAmount, setNewExpenseAmount] = useState("");
+  const [newExpenseCat, setNewExpenseCat] = useState("Marketing");
   
   // Local state for pixel settings inputs (uncommitted until save)
   const [inputFbPixel, setInputFbPixel] = useState(fbPixelId);
@@ -150,6 +240,38 @@ export default function AdminPanel({
     }
   };
 
+  const handleLandingImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert(
+          lang === "bn"
+            ? "দুঃখিত, ইমেজের সাইজ ৩ মেগাবাইটের (3MB) কম হতে হবে।"
+            : "Sorry, the image size should be less than 3MB."
+        );
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          setEditingProduct((prev) => {
+            if (!prev) return null;
+            const currentImages = [...(prev.images || [])];
+            while (currentImages.length <= index) {
+              currentImages.push("");
+            }
+            currentImages[index] = reader.result as string;
+            return {
+              ...prev,
+              images: currentImages
+            };
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct?.name || !editingProduct?.price) return;
@@ -174,7 +296,10 @@ export default function AdminPanel({
         category: editingProduct.category || "General",
         rating: 5.0,
         reviewsCount: 0,
-        stock: editingProduct.stock !== undefined ? Number(editingProduct.stock) : 10
+        stock: editingProduct.stock !== undefined ? Number(editingProduct.stock) : 10,
+        images: editingProduct.images || [],
+        landingDescription: editingProduct.landingDescription || "",
+        banglaLandingDescription: editingProduct.banglaLandingDescription || ""
       };
       onUpdateProducts([newProduct, ...products]);
     }
@@ -302,60 +427,193 @@ export default function AdminPanel({
     );
   };
 
+  interface SidebarItem {
+    id: string;
+    labelBn: string;
+    labelEn: string;
+    icon: any;
+    count?: number;
+  }
+
+  const sidebarItems: SidebarItem[] = [
+    { id: "analytics", labelBn: "ড্যাশবোর্ড", labelEn: "Dashboard", icon: LayoutDashboard },
+    { id: "orders", labelBn: "অর্ডারসমূহ", labelEn: "Orders", icon: ShoppingBag, count: activeOrdersCount },
+    { id: "abandoned", labelBn: "অসম্পূর্ণ অর্ডার", labelEn: "Abandoned Orders", icon: ShoppingCart },
+    { id: "customers", labelBn: "গ্রাহক তালিকা", labelEn: "Customers", icon: Users },
+    { id: "accounts", labelBn: "হিসাব-নিকাশ", labelEn: "Accounts", icon: CreditCard },
+    { id: "products", labelBn: "প্রোডাক্ট ম্যানেজার", labelEn: "Products", icon: Package },
+    { id: "categories", labelBn: "ক্যাটাগরি", labelEn: "Categories", icon: Layers },
+    { id: "authors", labelBn: "লেখকবৃন্দ", labelEn: "Authors", icon: Feather },
+    { id: "publishers", labelBn: "প্রকাশক", labelEn: "Publishers", icon: BookOpen },
+    { id: "banners", labelBn: "ব্যানার", labelEn: "Banners", icon: ImageIcon },
+    { id: "stock", labelBn: "স্টক রেকর্ড", labelEn: "Stock", icon: Activity },
+    { id: "landing", labelBn: "ল্যান্ডিং পেজ", labelEn: "Landing Pages", icon: Globe },
+    { id: "delivery", labelBn: "ডেলিভারি", labelEn: "Delivery", icon: Truck },
+    { id: "sms", labelBn: "এসএমএস সিস্টেম", labelEn: "SMS", icon: MessageSquare },
+    { id: "roles", labelBn: "অ্যাডমিন রোলস", labelEn: "Roles", icon: Key },
+    { id: "users", labelBn: "ইউজার লিস্ট", labelEn: "Users", icon: Settings },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Tab Navigation */}
-      <div className="flex border-b border-gray-100 pb-px gap-6 overflow-x-auto">
-        <button
-          id="admin-tab-analytics"
-          onClick={() => setActiveTab("analytics")}
-          className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap ${
-            activeTab === "analytics"
-              ? "border-[#3730a3] text-[#3730a3]"
-              : "border-transparent text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          📈 {lang === "bn" ? "অ্যানালিটিক্স ড্যাশবোর্ড" : "Analytics & Overview"}
-        </button>
-        <button
-          id="admin-tab-orders"
-          onClick={() => setActiveTab("orders")}
-          className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap ${
-            activeTab === "orders"
-              ? "border-[#3730a3] text-[#3730a3]"
-              : "border-transparent text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          📦 {lang === "bn" ? "অর্ডার ম্যানেজমেন্ট" : "Orders Dashboard"}
-          {activeOrdersCount > 0 && (
-            <span className="ml-2 bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {activeOrdersCount}
-            </span>
-          )}
-        </button>
-        <button
-          id="admin-tab-products"
-          onClick={() => setActiveTab("products")}
-          className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap ${
-            activeTab === "products"
-              ? "border-[#3730a3] text-[#3730a3]"
-              : "border-transparent text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          🛍️ {lang === "bn" ? "প্রোডাক্ট ম্যানেজার" : "Product Catalog"}
-        </button>
-        <button
-          id="admin-tab-pixel"
-          onClick={() => setActiveTab("pixel")}
-          className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap ${
-            activeTab === "pixel"
-              ? "border-[#3730a3] text-[#3730a3]"
-              : "border-transparent text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          🚀 {lang === "bn" ? "মার্কেটিং ও পিক্সেল বুস্টিং" : "Facebook & TikTok Pixels"}
-        </button>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50/50 rounded-3xl border border-gray-150 overflow-hidden shadow-sm -mx-4 sm:-mx-6 -my-6">
+      
+      {/* MOBILE HEADER BAR */}
+      <div className="lg:hidden bg-[#0f172a] text-white p-4 flex items-center justify-between border-b border-gray-800 shrink-0">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={() => setIsSidebarOpenMobile(!isSidebarOpenMobile)}
+            className="p-1 text-slate-300 hover:text-white transition-colors cursor-pointer"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex items-center">
+            <span className="bg-[#2563eb] text-white font-black text-xs px-2 py-1 rounded-md mr-1.5 shadow-sm">JB</span>
+            <span className="font-extrabold text-sm tracking-tight text-white">Johurul BDShop</span>
+          </div>
+        </div>
+        <div className="bg-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded border border-slate-700">
+          {lang === "bn" ? "অ্যাডমিন" : "Admin"}
+        </div>
       </div>
+
+      {/* MOBILE DRAWER SIDEBAR */}
+      {isSidebarOpenMobile && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300 animate-fade-in"
+            onClick={() => setIsSidebarOpenMobile(false)}
+          />
+          <div className="relative flex flex-col w-72 max-w-xs bg-[#0f172a] text-slate-300 h-full shadow-2xl z-10 p-5 overflow-y-auto">
+            <div className="flex items-center justify-between pb-5 border-b border-slate-800 mb-5">
+              <div className="flex items-center">
+                <span className="bg-[#2563eb] text-white font-black text-sm px-2.5 py-1.5 rounded-lg mr-2 shadow-sm">JB</span>
+                <span className="font-extrabold text-base tracking-tight text-white">Johurul BDShop</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsSidebarOpenMobile(false)}
+                className="p-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5 flex-1">
+              {sidebarItems.map((item) => {
+                const IconComp = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setIsSidebarOpenMobile(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive 
+                        ? "bg-[#2563eb] text-white shadow-md shadow-blue-900/30 font-black border-l-4 border-white"
+                        : "hover:bg-slate-800/60 text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <IconComp className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                      <span>{lang === "bn" ? item.labelBn : item.labelEn}</span>
+                    </div>
+                    {item.count && item.count > 0 ? (
+                      <span className="bg-red-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full shrink-0">
+                        {item.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="pt-4 border-t border-slate-800 mt-5 text-[10px] text-slate-500 text-center font-bold">
+              Johurul BDShop v2.4.0
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DESKTOP SIDEBAR PANEL */}
+      <div className="hidden lg:flex flex-col w-64 bg-[#0f172a] text-slate-300 border-r border-slate-800 p-5 shrink-0 select-none">
+        <div className="flex items-center pb-5 border-b border-slate-800/80 mb-5">
+          <span className="bg-[#2563eb] text-white font-black text-sm px-2.5 py-1.5 rounded-lg mr-2 shadow-sm shrink-0">JB</span>
+          <div className="min-w-0">
+            <h3 className="font-extrabold text-sm tracking-tight text-white truncate">Johurul BDShop</h3>
+            <span className="text-[10px] text-slate-500 font-extrabold tracking-wider uppercase block">Kamiab Prokashon Admin</span>
+          </div>
+        </div>
+
+        <div className="space-y-1 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+          {sidebarItems.map((item) => {
+            const IconComp = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  isActive 
+                    ? "bg-[#2563eb] text-white shadow-md shadow-blue-900/30 font-extrabold border-l-4 border-white"
+                    : "hover:bg-slate-800/60 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <IconComp className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-500"}`} />
+                  <span className="truncate">{lang === "bn" ? item.labelBn : item.labelEn}</span>
+                </div>
+                {item.count && item.count > 0 ? (
+                  <span className="bg-red-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full shrink-0">
+                    {item.count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="pt-4 border-t border-slate-800 mt-5">
+          <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
+            <span>Server Status</span>
+            <span className="text-emerald-500 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              ONLINE
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT MAIN PANEL */}
+      <div className="flex-1 min-w-0 bg-white lg:bg-slate-50/20 flex flex-col">
+        
+        {/* TOP STATUS RIBBON */}
+        <div className="hidden lg:flex items-center justify-between px-8 py-4 bg-white border-b border-gray-150 shrink-0">
+          <div className="text-xs text-gray-400 font-bold flex items-center gap-1">
+            <span>🏠</span>
+            <span>Johurul BDShop Admin</span>
+            <ChevronRight className="w-3 h-3 text-gray-300" />
+            <span className="text-[#3730a3] uppercase font-black">
+              {sidebarItems.find(item => item.id === activeTab)?.labelEn}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-xs font-black text-gray-700">admin@gms.com</div>
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Super Administrator</div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center shadow-md">
+              AD
+            </div>
+          </div>
+        </div>
+
+        {/* MAIN PANEL CONTENT BODY */}
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 overflow-y-auto flex-1">
 
       {/* RENDER ANALYTICS */}
       {activeTab === "analytics" && (
@@ -692,6 +950,47 @@ export default function AdminPanel({
               </div>
             </div>
 
+            {/* Search Filter Inputs Grid */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+              <div className="relative flex-1 w-full">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <Search className="w-4 h-4" />
+                </span>
+                <input 
+                  type="text" 
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  placeholder={lang === "bn" ? "অর্ডার আইডি, ফোন অথবা নাম দিয়ে খুঁজুন..." : "Search by order#, phone, name..."}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
+                />
+              </div>
+              <div className="flex gap-2 w-full md:w-auto">
+                <select
+                  value={orderStatusFilter}
+                  onChange={(e) => setOrderStatusFilter(e.target.value)}
+                  className="bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="all">{lang === "bn" ? "সব স্ট্যাটাস" : "All Statuses"}</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="PACKED">PACKED</option>
+                  <option value="SHIPPED">SHIPPED</option>
+                  <option value="DELIVERED">DELIVERED</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderSearchQuery("");
+                    setOrderStatusFilter("all");
+                  }}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer"
+                >
+                  {lang === "bn" ? "রিসেট" : "Reset"}
+                </button>
+              </div>
+            </div>
+
             {/* Standard Orders list wrapper */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
               <div className="flex justify-between items-center pb-4 border-b border-gray-100">
@@ -722,6 +1021,21 @@ export default function AdminPanel({
                       return prod.supplierShop?.trim().toLowerCase() === selectedSupplier.trim().toLowerCase();
                     })
                   );
+                }
+
+                // Filter by Search Query
+                if (orderSearchQuery.trim()) {
+                  const q = orderSearchQuery.toLowerCase();
+                  displayedOrders = displayedOrders.filter(order => 
+                    order.id.toLowerCase().includes(q) ||
+                    order.customerName.toLowerCase().includes(q) ||
+                    order.customerPhone.toLowerCase().includes(q)
+                  );
+                }
+
+                // Filter by Status
+                if (orderStatusFilter !== "all") {
+                  displayedOrders = displayedOrders.filter(order => order.status === orderStatusFilter);
                 }
 
                 if (displayedOrders.length === 0) {
@@ -1036,6 +1350,128 @@ export default function AdminPanel({
                   />
                 </div>
 
+                {/* Landing Page Extra Configuration Section */}
+                <div className="md:col-span-2 border-t border-gray-200 pt-5 mt-2 space-y-4">
+                  <h4 className="text-sm font-extrabold text-indigo-900 flex items-center gap-2">
+                    <span>✨</span>
+                    {lang === "bn" ? "ল্যান্ডিং পেজ কনফিগারেশন (৩-৪ অতিরিক্ত ছবি ও বর্ণনা)" : "Landing Page Extra Config (3-4 Extra Images & Description)"}
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    {lang === "bn" 
+                      ? "পণ্যটির জন্য একটি আকর্ষণীয় ফুল-লেংথ ল্যান্ডিং পেজ তৈরি করতে এখানে অতিরিক্ত ৩ থেকে ৪টি ছবি এবং বিস্তারিত বিবরণ যোগ করুন।" 
+                      : "Add up to 4 additional images and write high-converting descriptive sections to turn this product detail page into a full-length landing page."}
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-600 block">Landing Page Long Description (English)</label>
+                      <textarea
+                        id="form-landing-desc-en"
+                        value={editingProduct?.landingDescription || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, landingDescription: e.target.value })}
+                        rows={3}
+                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs resize-none"
+                        placeholder="Write dynamic sales copywriting, specifications, and user benefits for the landing page..."
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-600 block">ল্যান্ডিং পেজ দীর্ঘ বিবরণ (বাংলা)</label>
+                      <textarea
+                        id="form-landing-desc-bn"
+                        value={editingProduct?.banglaLandingDescription || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, banglaLandingDescription: e.target.value })}
+                        rows={3}
+                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs resize-none"
+                        placeholder="ল্যান্ডিং পেজের জন্য আকর্ষণীয় অফার টেক্সট, ব্যবহারের নিয়মাবলি এবং কাস্টমার রিভিউ বিবরণ লিখুন..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4 Extra Images List */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-600 block">
+                      {lang === "bn" ? "অতিরিক্ত ল্যান্ডিং পেজ ছবি তালিকা (সর্বোচ্চ ৪টি)" : "Additional Landing Page Images List (Max 4)"}
+                    </label>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {[0, 1, 2, 3].map((idx) => {
+                        const currentImageUrl = editingProduct?.images?.[idx] || "";
+                        return (
+                          <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-white space-y-2 flex flex-col justify-between">
+                            <span className="text-[10px] font-bold text-gray-400 block uppercase">
+                              {lang === "bn" ? `ছবি নম্বর ${idx + 1}` : `Image #${idx + 1}`}
+                            </span>
+
+                            <div className="h-24 bg-gray-50 border border-dashed border-gray-200 rounded-lg flex items-center justify-center overflow-hidden relative group">
+                              {currentImageUrl ? (
+                                <>
+                                  <img 
+                                    src={currentImageUrl} 
+                                    alt={`Landing #${idx + 1}`} 
+                                    className="w-full h-full object-cover" 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingProduct((prev) => {
+                                        if (!prev) return null;
+                                        const nextImages = [...(prev.images || [])];
+                                        nextImages[idx] = "";
+                                        return { ...prev, images: nextImages };
+                                      });
+                                    }}
+                                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white rounded-lg cursor-pointer"
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => document.getElementById(`landing-file-input-${idx}`)?.click()}
+                                  className="w-full h-full flex flex-col items-center justify-center text-gray-400 hover:text-indigo-600 transition-colors cursor-pointer text-xs font-bold"
+                                >
+                                  <Plus className="w-5 h-5 mb-1" />
+                                  <span>{lang === "bn" ? "আপলোড করুন" : "Upload"}</span>
+                                </button>
+                              )}
+                              <input 
+                                type="file" 
+                                id={`landing-file-input-${idx}`} 
+                                accept="image/*" 
+                                onChange={(e) => handleLandingImageFileChange(e, idx)} 
+                                className="hidden" 
+                              />
+                            </div>
+
+                            {/* Direct URL Input */}
+                            <input
+                              type="text"
+                              value={currentImageUrl}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditingProduct((prev) => {
+                                  if (!prev) return null;
+                                  const nextImages = [...(prev.images || [])];
+                                  while (nextImages.length <= idx) {
+                                    nextImages.push("");
+                                  }
+                                  nextImages[idx] = val;
+                                  return { ...prev, images: nextImages };
+                                });
+                              }}
+                              placeholder={lang === "bn" ? "অথবা ছবির লিংক" : "Or paste URL"}
+                              className="w-full bg-gray-50 border border-gray-100 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-1.5 md:col-span-2 bg-indigo-50/40 border border-indigo-100/50 p-3.5 rounded-2xl">
                   <label className="text-[#3730a3] font-bold block mb-1 flex items-center gap-1.5">
                     <span>🏪</span> 
@@ -1160,7 +1596,7 @@ export default function AdminPanel({
       )}
 
       {/* RENDER MARKETING & PIXELS */}
-      {activeTab === "pixel" && (
+      {activeTab === "landing" && (
         <div className="space-y-6 animate-fade-in animate-duration-200">
           
           {/* Header Card */}
@@ -1589,6 +2025,1031 @@ export default function AdminPanel({
 
         </div>
       )}
+
+      {/* RENDER ABANDONED CHECKOUTS */}
+      {activeTab === "abandoned" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-gradient-to-r from-red-500/80 to-amber-600/80 rounded-3xl p-6 text-white shadow-md">
+            <h3 className="text-xl font-black">🛒 {lang === "bn" ? "অসম্পূর্ণ কার্ট ও পরিত্যক্ত অর্ডার" : "Abandoned Checkouts Recovery"}</h3>
+            <p className="text-xs text-amber-50 mt-1">
+              {lang === "bn" ? "যেসব কাস্টমার চেকআউট ফর্মে নাম-ঠিকানা লিখলেও সম্পূর্ণ অর্ডার সাবমিট করেনি, তাদের তালিকা নিচে দেওয়া হলো।" : "Customers who initiated checkout, entered some info, but did not complete order placement."}
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "পরিত্যক্ত কার্ট ডাটা" : "Abandoned Records Stream"}</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                    <th className="pb-3">CART ID</th>
+                    <th className="pb-3">CUSTOMER</th>
+                    <th className="pb-3">ITEMS SUMMARY</th>
+                    <th className="pb-3">POTENTIAL TOTAL</th>
+                    <th className="pb-3">ABANDONED AT</th>
+                    <th className="pb-3">STATUS</th>
+                    <th className="pb-3 text-right">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                  {abandonedOrders.map((rec) => (
+                    <tr key={rec.id} className="hover:bg-gray-50/50">
+                      <td className="py-3 font-mono font-bold text-red-600">{rec.id}</td>
+                      <td className="py-3">
+                        <div className="font-bold text-gray-900">{rec.name}</div>
+                        <div className="text-gray-400 font-mono text-[10px]">{rec.phone}</div>
+                      </td>
+                      <td className="py-3 text-gray-500">{rec.items}</td>
+                      <td className="py-3 font-black">৳{rec.amount}</td>
+                      <td className="py-3 text-gray-400 font-semibold">{rec.time}</td>
+                      <td className="py-3">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                          rec.status === "Recovered" ? "bg-green-50 text-green-700 animate-pulse" : "bg-amber-50 text-amber-700"
+                        }`}>{rec.status}</span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          {rec.status === "Active" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  alert(lang === "bn" ? `${rec.name} কে হোয়াটসঅ্যাপে রিমাইন্ডার পাঠানো হয়েছে!` : `WhatsApp recovery reminder sent to ${rec.name} (${rec.phone})!`);
+                                }}
+                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-100 flex items-center gap-1 cursor-pointer"
+                              >
+                                💬 WhatsApp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const confirmed = window.confirm(lang === "bn" ? "আপনি কি এই কার্টটিকে একটি কনফার্মড অর্ডারে রুপান্তর করতে চান?" : "Convert this abandoned cart into a live order?");
+                                  if (confirmed) {
+                                    const mockOrder: Order = {
+                                      id: rec.id.replace("AB-", ""),
+                                      customerName: rec.name,
+                                      customerPhone: rec.phone,
+                                      customerAddress: "Mymensingh Town, Bangladesh",
+                                      customerThana: "Mymensingh Sadar",
+                                      customerDistrict: "Mymensingh",
+                                      customerDivision: "Mymensingh",
+                                      cartItems: [{
+                                        product: products[0] || { id: "p1", name: "Recovered Item", price: rec.amount, image: "", description: "", category: "General", stock: 100, rating: 5, reviewsCount: 12 },
+                                        quantity: 1
+                                      }],
+                                      totalAmount: rec.amount,
+                                      paymentMethod: "cod",
+                                      status: OrderStatus.RECEIVED,
+                                      createdAt: new Date().toISOString(),
+                                      trackingHistory: createDefaultTrackingHistory()
+                                    };
+                                    onUpdateOrders([mockOrder, ...orders]);
+                                    setAbandonedOrders(abandonedOrders.map(a => a.id === rec.id ? { ...a, status: "Recovered" } : a));
+                                    alert(lang === "bn" ? "সফলভাবে কার্ট অর্ডার কনভার্ট করা হয়েছে!" : "Cart converted to active order successfully!");
+                                  }
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer shadow-sm animate-pulse"
+                              >
+                                ✅ Recover
+                              </button>
+                            </>
+                          )}
+                          {rec.status === "Recovered" && (
+                            <span className="text-[10px] text-green-600 font-bold">🎉 Successfully Saved</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER CUSTOMERS LEDGER */}
+      {activeTab === "customers" && (() => {
+        const customersMap: Record<string, { name: string; phone: string; address: string; totalSpent: number; orderCount: number; lastActive: string }> = {};
+        orders.forEach(o => {
+          const key = o.customerPhone.trim();
+          if (!customersMap[key]) {
+            customersMap[key] = {
+              name: o.customerName,
+              phone: o.customerPhone,
+              address: `${o.customerThana ? `${o.customerThana}, ` : ""}${o.customerDistrict}`,
+              totalSpent: 0,
+              orderCount: 0,
+              lastActive: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "Just now"
+            };
+          }
+          customersMap[key].totalSpent += o.totalAmount;
+          customersMap[key].orderCount += 1;
+        });
+
+        const sortedCustomers = Object.values(customersMap);
+
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
+                <div>
+                  <h3 className="text-lg font-black text-gray-900">{lang === "bn" ? "গ্রাহক ডাটাবেস ও লাইফ-টাইম ভ্যালু" : "Customer Ledger & LTV"}</h3>
+                  <p className="text-xs text-gray-400 font-semibold">{lang === "bn" ? "অর্ডারকারী সকল ইউনিক গ্রাহকদের মোট ক্রয়ের পরিমাণ ও কন্টাক্ট ইনফো।" : "Comprehensive list of unique shoppers and their cumulative purchasing value."}</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-2xl text-xs font-black text-[#3730a3]">
+                  {sortedCustomers.length} {lang === "bn" ? "ইউনিক কাস্টমার" : "Unique Clients"}
+                </div>
+              </div>
+
+              {sortedCustomers.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 text-sm">
+                  {lang === "bn" ? "কোনো ইউনিক কাস্টমার পাওয়া যায়নি। প্রথমে অর্ডার প্লেস করুন।" : "No unique customer accounts detected yet."}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                        <th className="pb-3">{lang === "bn" ? "কাস্টমার নাম" : "Customer Name"}</th>
+                        <th className="pb-3">{lang === "bn" ? "মোবাইল নম্বর" : "Phone Number"}</th>
+                        <th className="pb-3">{lang === "bn" ? "ঠিকানা" : "Primary Area"}</th>
+                        <th className="pb-3 text-center">{lang === "bn" ? "অর্ডার সংখ্যা" : "Orders Count"}</th>
+                        <th className="pb-3">{lang === "bn" ? "মোট কেনাকাটা" : "Lifetime Value"}</th>
+                        <th className="pb-3">{lang === "bn" ? "সর্বশেষ সক্রিয়" : "Last Purchase"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                      {sortedCustomers.map((cust, i) => (
+                        <tr key={i} className="hover:bg-gray-50/50">
+                          <td className="py-3.5 font-bold text-gray-900">{cust.name}</td>
+                          <td className="py-3.5 font-mono text-indigo-700 font-semibold">{cust.phone}</td>
+                          <td className="py-3.5 text-gray-500">{cust.address}</td>
+                          <td className="py-3.5 text-center">
+                            <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-full font-bold text-[10px]">{cust.orderCount}</span>
+                          </td>
+                          <td className="py-3.5 font-black text-[#3730a3]">৳{cust.totalSpent}</td>
+                          <td className="py-3.5 text-gray-400 font-semibold">{cust.lastActive}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* RENDER ACCOUNTS LEDGER */}
+      {activeTab === "accounts" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-5 shadow-xs">
+              <span className="text-[10px] text-emerald-800 font-black uppercase tracking-wider block">Total Sales Receipts</span>
+              <h4 className="text-2xl font-black text-emerald-900 mt-1">৳{totalRevenue}</h4>
+              <p className="text-[10px] text-emerald-600 font-bold mt-1">Directly logged from orders</p>
+            </div>
+            
+            <div className="bg-red-50 border border-red-100 rounded-3xl p-5 shadow-xs">
+              <span className="text-[10px] text-red-800 font-black uppercase tracking-wider block">Total Expenditures</span>
+              <h4 className="text-2xl font-black text-red-900 mt-1">৳{expenses.reduce((sum, e) => sum + e.amount, 0)}</h4>
+              <p className="text-[10px] text-red-600 font-bold mt-1">Ad boosters & operations cost</p>
+            </div>
+
+            <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-5 shadow-xs">
+              <span className="text-[10px] text-indigo-800 font-black uppercase tracking-wider block">Net Profit Margin</span>
+              <h4 className="text-2xl font-black text-[#3730a3] mt-1">৳{totalRevenue - expenses.reduce((sum, e) => sum + e.amount, 0)}</h4>
+              <p className="text-[10px] text-[#3730a3] font-bold mt-1">Estimated business earnings</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন খরচ যুক্ত করুন" : "Add New Expense"}</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newExpenseDesc || !newExpenseAmount) return;
+                const newExp = {
+                  id: `E-${Math.floor(Math.random() * 100) + 410}`,
+                  description: newExpenseDesc,
+                  amount: Number(newExpenseAmount),
+                  category: newExpenseCat,
+                  date: new Date().toISOString().split("T")[0]
+                };
+                setExpenses([newExp, ...expenses]);
+                setNewExpenseDesc("");
+                setNewExpenseAmount("");
+                alert(lang === "bn" ? "খরচ সফলভাবে যুক্ত হয়েছে!" : "Expense added successfully!");
+              }} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "খরচের বিবরণ" : "Expense Description"}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Meta Ads Boost"
+                    value={newExpenseDesc}
+                    onChange={(e) => setNewExpenseDesc(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "খরচের পরিমাণ (টাকা)" : "Amount (৳)"}</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 1500"
+                      value={newExpenseAmount}
+                      onChange={(e) => setNewExpenseAmount(e.target.value)}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "খরচের খাত" : "Category"}</label>
+                    <select
+                      value={newExpenseCat}
+                      onChange={(e) => setNewExpenseCat(e.target.value)}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                    >
+                      <option value="Marketing font-bold">Marketing</option>
+                      <option value="Operations font-bold">Operations</option>
+                      <option value="Utilities font-bold">Utilities</option>
+                      <option value="Inventory font-bold">Inventory</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  ➕ {lang === "bn" ? "রেকর্ড যুক্ত করুন" : "Add Expense Record"}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "খরচের বিবরণী" : "Expenditures Ledger"}</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                      <th className="pb-3">EXP ID</th>
+                      <th className="pb-3">DESCRIPTION</th>
+                      <th className="pb-3">CATEGORY</th>
+                      <th className="pb-3">DATE</th>
+                      <th className="pb-3 text-right">AMOUNT</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                    {expenses.map((e) => (
+                      <tr key={e.id}>
+                        <td className="py-3 font-mono font-bold text-slate-500">{e.id}</td>
+                        <td className="py-3 text-gray-900 font-semibold">{e.description}</td>
+                        <td className="py-3">
+                          <span className="bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded text-[10px] font-bold">{e.category}</span>
+                        </td>
+                        <td className="py-3 text-gray-400">{e.date}</td>
+                        <td className="py-3 font-black text-right text-red-600">৳{e.amount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER CATEGORIES */}
+      {activeTab === "categories" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন ক্যাটাগরি তৈরি করুন" : "Add New Category"}</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newCatName) return;
+                const newCat = {
+                  id: `cat-${categories.length + 1}`,
+                  name: newCatName,
+                  count: 0,
+                  slug: newCatName.toLowerCase().replace(/\s+/g, "-")
+                };
+                setCategories([...categories, newCat]);
+                setNewCatName("");
+                alert(lang === "bn" ? "ক্যাটাগরি সফলভাবে তৈরি হয়েছে!" : "Category created successfully!");
+              }} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ক্যাটাগরির নাম" : "Category Name"}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Smart Glasses"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  ➕ {lang === "bn" ? "ক্যাটাগরি তৈরি করুন" : "Create Category"}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "ক্যাটাগরি সমূহ" : "Product Categories"}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {categories.map((cat) => {
+                  const actualCount = products.filter(p => p.category.toLowerCase() === cat.name.toLowerCase()).length;
+                  return (
+                    <div key={cat.id} className="bg-slate-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between hover:bg-indigo-50/20 transition-all">
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-sm">{cat.name}</h4>
+                        <span className="text-[10px] text-gray-400 font-mono">Slug: /{cat.slug}</span>
+                      </div>
+                      <div className="bg-indigo-50 text-[#3730a3] border border-indigo-100 text-[10px] font-black px-2.5 py-1 rounded-full">
+                        {actualCount > 0 ? actualCount : cat.count} products
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER AUTHORS */}
+      {activeTab === "authors" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন লেখক/কিউরেটর যুক্ত করুন" : "Add Brand Author / Curator"}</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newAuthorName || !newAuthorBio) return;
+                const newAuth = {
+                  id: `auth-${authors.length + 1}`,
+                  name: newAuthorName,
+                  bio: newAuthorBio,
+                  image: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150"
+                };
+                setAuthors([...authors, newAuth]);
+                setNewAuthorName("");
+                setNewAuthorBio("");
+                alert(lang === "bn" ? "লেখক সফলভাবে যুক্ত করা হয়েছে!" : "Curator added successfully!");
+              }} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "নাম" : "Full Name"}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Masumbillah"
+                    value={newAuthorName}
+                    onChange={(e) => setNewAuthorName(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ছোট পরিচিতি (Bio)" : "Short Biography"}</label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="e.g. Expert in tech imports..."
+                    value={newAuthorBio}
+                    onChange={(e) => setNewAuthorBio(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  ➕ {lang === "bn" ? "কিউরেটর যুক্ত করুন" : "Add Author Profile"}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "লেখক ও কিউরেটর প্রোফাইল" : "Store Curators & Authors Directory"}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {authors.map((auth) => (
+                  <div key={auth.id} className="bg-slate-50 border border-gray-100 rounded-2xl p-4 flex gap-3 hover:bg-indigo-50/20 transition-all font-sans">
+                    <img
+                      src={auth.image}
+                      alt={auth.name}
+                      className="w-12 h-12 rounded-full object-cover shrink-0 border-2 border-white shadow-sm"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div>
+                      <h4 className="font-extrabold text-gray-900 text-sm">{auth.name}</h4>
+                      <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{auth.bio}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER PUBLISHERS */}
+      {activeTab === "publishers" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন প্রকাশক / উৎস ব্র্যান্ড" : "Add Brand Publisher / Sourcing partner"}</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPubName || !newPubLocation) return;
+                const newPub = {
+                  id: `pub-${publishers.length + 1}`,
+                  name: newPubName,
+                  location: newPubLocation,
+                  productsCount: 0
+                };
+                setPublishers([...publishers, newPub]);
+                setNewPubName("");
+                setNewPubLocation("");
+                alert(lang === "bn" ? "ব্র্যান্ড সফলভাবে যুক্ত করা হয়েছে!" : "Sourcing partner added successfully!");
+              }} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "নাম" : "Publisher / Brand Name"}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Kamiab Prokashon"
+                    value={newPubName}
+                    onChange={(e) => setNewPubName(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ঠিকানা / লোকেশন" : "Sourcing Hub Address"}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Banglabazar, Dhaka"
+                    value={newPubLocation}
+                    onChange={(e) => setNewPubLocation(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  ➕ {lang === "bn" ? "ব্র্যান্ড যুক্ত করুন" : "Add Brand Sourcing"}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "উৎস শপ ও প্রকাশক সমূহ" : "Authorized Publishers & Brands list"}</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                      <th className="pb-3">BRAND ID</th>
+                      <th className="pb-3">NAME / BRAND</th>
+                      <th className="pb-3">HUB LOCATION</th>
+                      <th className="pb-3 text-right">TOTAL ITEMS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                    {publishers.map((pub) => (
+                      <tr key={pub.id}>
+                        <td className="py-3 font-mono font-bold text-slate-500">{pub.id}</td>
+                        <td className="py-3 text-gray-900 font-extrabold">{pub.name}</td>
+                        <td className="py-3 text-gray-500 font-semibold">📍 {pub.location}</td>
+                        <td className="py-3 text-right font-bold text-[#3730a3]">{pub.productsCount} catalog items</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER BANNERS */}
+      {activeTab === "banners" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="pb-4 border-b border-gray-50">
+              <h3 className="text-lg font-black text-gray-900">{lang === "bn" ? "স্টোর হেডার ব্যানার ও স্লাইডার" : "Homepage Banner & Promotions Config"}</h3>
+              <p className="text-xs text-gray-400 font-semibold">{lang === "bn" ? "আপনার ল্যান্ডিং পেজের প্রধান আকর্ষণীয় স্লাইড ব্যানার পরিবর্তন বা এডিট করুন।" : "Manage active homepage promotion sliders and main background assets."}</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "প্রধান ব্যানার ইমেজ লিংক পরিবর্তন করুন" : "Set Active Background Hero Image URL"}</h4>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={inputHeroImage}
+                    onChange={(e) => {
+                      setInputHeroImage(e.target.value);
+                      setIsBannerSaved(false);
+                    }}
+                    placeholder="Enter Banner Image URL (https://...)"
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-mono text-gray-600 focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChangeHeroImageUrl(inputHeroImage);
+                        setIsBannerSaved(true);
+                        setTimeout(() => setIsBannerSaved(false), 2500);
+                      }}
+                      className="bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2 px-5 rounded-xl cursor-pointer transition-all shadow-sm flex items-center gap-1"
+                    >
+                      {isBannerSaved ? "✔️ Saved" : "💾 Save Banner Image"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputHeroImage(watchBannerImg);
+                        onChangeHeroImageUrl(watchBannerImg);
+                        alert(lang === "bn" ? "ডিফল্ট ব্যানার সফলভাবে সেট করা হয়েছে!" : "Default banner restored!");
+                      }}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs py-2 px-4 rounded-xl cursor-pointer"
+                    >
+                      Restore Default
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 text-xs text-gray-500 leading-relaxed space-y-1">
+                  <h5 className="font-bold text-[#3730a3]">💡 Layout Optimization Tip</h5>
+                  <p>Recommended aspect ratio is 16:9 or 21:9. Make sure the background is relatively dark or styled cleanly to keep typography elements perfectly readable for your conversion campaigns.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-black text-gray-400 uppercase tracking-wider">{lang === "bn" ? "ব্যানারের বাস্তবসম্মত প্রিভিউ" : "Live Header Preview"}</h4>
+                <div className="aspect-video rounded-3xl overflow-hidden border border-gray-150 shadow-sm relative group bg-black">
+                  <img
+                    src={heroImageUrl || watchBannerImg}
+                    alt="Active Banner Preview"
+                    className="w-full h-full object-cover opacity-80"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-5 text-white">
+                    <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full w-fit mb-1">Active Banner</span>
+                    <h5 className="text-sm font-extrabold truncate font-sans">{lang === "bn" ? "স্মার্টওয়াচ ধামাকা অফার" : "Premium Electronics Showcase"}</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER STOCK */}
+      {activeTab === "stock" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
+            <div className="pb-4 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div>
+                <h3 className="text-lg font-black text-gray-900">{lang === "bn" ? "ইনভেন্টরি ও স্টক লেভেল" : "Warehouse Stock & Logistics"}</h3>
+                <p className="text-xs text-gray-400 font-semibold">{lang === "bn" ? "আপনার সকল পণ্যের এভেইলেবল স্টক লেভেল পরিবর্তন করুন এবং স্টক বাড়ান এক ক্লিকে।" : "Real-time stock monitoring, logs, and rapid quantity increment controls."}</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse font-sans">
+                <thead>
+                  <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                    <th className="pb-3">{lang === "bn" ? "প্রোডাক্ট বিবরণ" : "Product Details"}</th>
+                    <th className="pb-3">{lang === "bn" ? "ক্যাটাগরি" : "Category"}</th>
+                    <th className="pb-3">{lang === "bn" ? "স্টক বার" : "Inventory Level Bar"}</th>
+                    <th className="pb-3">{lang === "bn" ? "স্টক স্ট্যাটাস" : "Supply Status"}</th>
+                    <th className="pb-3 text-right">{lang === "bn" ? "স্টক পরিবর্তন" : "Quick Adjust Stock"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                  {products.map((p) => {
+                    const stockPercent = Math.min((p.stock / 100) * 100, 100);
+                    return (
+                      <tr key={p.id}>
+                        <td className="py-3.5 flex items-center gap-3">
+                          <img
+                            src={p.image}
+                            alt={p.name}
+                            className="w-10 h-10 rounded-lg object-cover border shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div>
+                            <h4 className="font-bold text-gray-900">{lang === "bn" ? p.banglaName || p.name : p.name}</h4>
+                            <span className="text-[10px] font-mono text-gray-400">ID: {p.id}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5">
+                          <span className="bg-indigo-50 text-[#3730a3] px-2 py-0.5 rounded text-[10px] font-bold">{p.category}</span>
+                        </td>
+                        <td className="py-3.5 w-48">
+                          <div className="space-y-1 font-mono">
+                            <span className="text-[10px] font-bold text-gray-600">{p.stock} pcs remaining</span>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  p.stock <= 5 ? "bg-red-500" : p.stock <= 15 ? "bg-amber-500" : "bg-emerald-500"
+                                }`}
+                                style={{ width: `${stockPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
+                            p.stock <= 0 
+                              ? "bg-red-50 text-red-700 border border-red-100" 
+                              : p.stock <= 5 
+                              ? "bg-amber-50 text-amber-700 border border-amber-100" 
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                          }`}>
+                            {p.stock <= 0 ? "OUT OF STOCK" : p.stock <= 5 ? "LOW STOCK" : "HEALTHY"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 text-right">
+                          <div className="flex justify-end items-center gap-1.5">
+                            <input
+                              id={`stock-input-${p.id}`}
+                              type="number"
+                              defaultValue={p.stock}
+                              className="w-16 bg-slate-50 border border-gray-250 rounded-lg px-2 py-1 text-center font-mono text-xs font-bold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`stock-input-${p.id}`) as HTMLInputElement;
+                                if (input) {
+                                  const newVal = Number(input.value);
+                                  const updated = products.map(prod => prod.id === p.id ? { ...prod, stock: newVal } : prod);
+                                  onUpdateProducts(updated);
+                                  alert(lang === "bn" ? "স্টক লেভেল সফলভাবে আপডেট হয়েছে!" : "Product stock level updated successfully!");
+                                }
+                              }}
+                              className="bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg cursor-pointer shadow-xs transition-all"
+                            >
+                              Update
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER DELIVERY */}
+      {activeTab === "delivery" && (
+        <div className="space-y-6 animate-fade-in animate-duration-200">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "শিপিং চার্জ কনফিগারেশন" : "Courier Shipping Rates"}</h4>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ঢাকার ভেতরে" : "Inside Dhaka"}</label>
+                  <div className="flex font-mono">
+                    <span className="bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl px-3 py-2 text-xs font-black flex items-center">৳</span>
+                    <input
+                      type="number"
+                      value={deliveryConfig.insideDhaka}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, insideDhaka: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-r-xl px-3 py-2 text-xs font-bold focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ঢাকার বাইরে" : "Outside Dhaka"}</label>
+                  <div className="flex font-mono">
+                    <span className="bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl px-3 py-2 text-xs font-black flex items-center">৳</span>
+                    <input
+                      type="number"
+                      value={deliveryConfig.outsideDhaka}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, outsideDhaka: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-r-xl px-3 py-2 text-xs font-bold focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Preferred Courier Provider</label>
+                  <select
+                    value={deliveryConfig.provider}
+                    onChange={(e) => setDeliveryConfig({ ...deliveryConfig, provider: e.target.value })}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                  >
+                    <option value="Pathao">Pathao Courier (পাঠাও কুরিয়ার)</option>
+                    <option value="RedX">RedX Logistics (রেডএক্স ডেলিভারি)</option>
+                    <option value="Steadfast">Steadfast Courier (স্টিডফাস্ট)</option>
+                    <option value="eCourier">eCourier BD (ই-কুরিয়ার)</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(lang === "bn" ? "শিপিং রেট এবং সেটিংস সফলভাবে আপডেট হয়েছে!" : "Shipping rates and provider saved successfully!");
+                  }}
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  💾 Save Shipping Rates
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "কুরিয়ার API কানেকশন ও বুকিং" : "Courier APIs Integration Live Hub"}</h4>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
+                  <span className="text-[9px] text-emerald-800 font-black block tracking-wider uppercase">Courier Gateway</span>
+                  <div className="text-emerald-700 font-black text-xs mt-1">CONNECTED</div>
+                </div>
+                <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-center">
+                  <span className="text-[9px] text-indigo-800 font-black block tracking-wider uppercase">Pending Shipments</span>
+                  <div className="text-[#3730a3] font-black text-xs mt-1 font-mono">
+                    {orders.filter(o => o.status === OrderStatus.RECEIVED || o.status === OrderStatus.PROCESSING).length} consignments
+                  </div>
+                </div>
+                <div className="p-3 bg-purple-50 rounded-2xl border border-purple-100 text-center">
+                  <span className="text-[9px] text-purple-800 font-black block tracking-wider uppercase">Fulfilled Rate</span>
+                  <div className="text-purple-700 font-black text-xs mt-1">94.2% delivery success</div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-gray-100 space-y-3 font-sans">
+                <h5 className="font-extrabold text-xs text-gray-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                  {deliveryConfig.provider} Bulk Shipment Booker
+                </h5>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Bulk sync pending orders with your courier backend instantly. Auto-generates billing consignment barcodes, assigns tracking slips, and exports shipping details directly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const count = orders.filter(o => o.status === OrderStatus.PROCESSING).length;
+                    if (count === 0) {
+                      alert(lang === "bn" ? "বুকিং করার মতো কোনো PROCESSING অর্ডার নেই।" : "No PROCESSING status orders ready for booking.");
+                    } else {
+                      alert(lang === "bn" ? `${count}টি অর্ডার সফলভাবে কুরিয়ার ড্যাশবোর্ডে বুক করা হয়েছে এবং বারকোড স্লিপ জেনারেট করা হয়েছে!` : `${count} orders successfully booked with ${deliveryConfig.provider} and shipping barcodes generated!`);
+                    }
+                  }}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] font-bold text-xs px-4 py-2.5 rounded-xl border border-indigo-100 hover:scale-[1.02] transition-all cursor-pointer"
+                >
+                  🚀 Bulk Book Confirmed Invoices with {deliveryConfig.provider}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER SMS SYSTEM */}
+      {activeTab === "sms" && (
+        <div className="space-y-6 animate-fade-in animate-duration-200">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 lg:col-span-1 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "অর্ডার এসএমএস টেমপ্লেট" : "SMS Confirmation template"}</h4>
+              <div className="space-y-3 font-sans">
+                <textarea
+                  rows={6}
+                  value={smsTemplate}
+                  onChange={(e) => setSmsTemplate(e.target.value)}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-2xl p-4 text-xs font-semibold leading-relaxed text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <div className="text-[10px] text-gray-400 font-medium">
+                  Fields: <code className="bg-gray-100 font-bold px-1 rounded">[CUSTOMER_NAME]</code>, <code className="bg-gray-100 font-bold px-1 rounded">[ORDER_ID]</code>, <code className="bg-gray-100 font-bold px-1 rounded">[TOTAL_AMOUNT]</code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(lang === "bn" ? "এসএমএস এলার্ট টেমপ্লেট সফলভাবে আপডেট করা হয়েছে!" : "SMS notifications template successfully saved!");
+                  }}
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  💾 Save Template
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4 font-sans">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "এসএমএস গেটওয়ে লগ ও ব্যালেন্স" : "SMS Gateway Logs & Balance"}</h4>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-indigo-50/50 rounded-2xl border border-indigo-100 p-4 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase">SMS Gateway Provider</span>
+                    <h5 className="font-black text-gray-800 text-sm mt-0.5">BulksmsBD API</h5>
+                  </div>
+                  <span className="bg-green-50 text-green-700 font-bold text-[10px] px-2 py-0.5 rounded border border-green-200">ACTIVE</span>
+                </div>
+                <div className="bg-indigo-50/50 rounded-2xl border border-indigo-100 p-4 flex justify-between items-center font-mono">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-sans font-bold uppercase">SMS API Balance</span>
+                    <h5 className="font-black text-gray-800 text-sm mt-0.5">৳ 1,480.00</h5>
+                  </div>
+                  <span className="bg-indigo-100 text-[#3730a3] font-bold text-[10px] px-2 py-0.5 rounded border border-indigo-200">~ 4,933 SMS left</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider">SMS Dispatch Logs (এসএমএস প্রেরণ লগ)</h5>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                        <th className="pb-3">SMS ID</th>
+                        <th className="pb-3">RECIPIENT PHONE</th>
+                        <th className="pb-3">MESSAGE CONTENT</th>
+                        <th className="pb-3">DISPATCHED AT</th>
+                        <th className="pb-3 text-right">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                      {smsHistory.map((sh) => (
+                        <tr key={sh.id}>
+                          <td className="py-2.5 font-mono font-bold text-slate-500">{sh.id}</td>
+                          <td className="py-2.5 font-mono text-[#3730a3] font-semibold">{sh.recipient}</td>
+                          <td className="py-2.5 text-gray-500 font-semibold max-w-[200px] truncate">{sh.message}</td>
+                          <td className="py-2.5 text-gray-400">{sh.time}</td>
+                          <td className="py-2.5 text-right">
+                            <span className="bg-green-50 text-green-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-green-100">{sh.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER ROLES */}
+      {activeTab === "roles" && (
+        <div className="space-y-6 animate-fade-in animate-duration-200">
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 font-sans">
+            <h3 className="text-lg font-black text-gray-900">{lang === "bn" ? "অ্যাডমিন প্যানেল রোলস ও পারমিশন" : "Role-Based Access Control"}</h3>
+            <p className="text-xs text-gray-400 font-semibold">{lang === "bn" ? "অপারেটর ও স্টাফদের জন্য নির্দিষ্ট পেজ এবং ফিচার ব্যবহারের পারমিশন নিয়ন্ত্রণ করুন।" : "Toggle view/write privileges across dashboard modules for security audits."}</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {roles.map((role) => (
+                <div key={role.id} className="bg-slate-50 border border-gray-100 rounded-2xl p-5 space-y-4 hover:border-indigo-200 transition-all">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <h4 className="font-extrabold text-gray-900 text-sm">{role.name}</h4>
+                    <span className="bg-indigo-50 text-[#3730a3] text-[10px] font-black px-2.5 py-0.5 rounded-full border border-indigo-100">
+                      {role.usersCount} users active
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <span className="text-[9px] text-gray-400 font-black uppercase block tracking-wider">Assigned Privileges</span>
+                    <div className="space-y-1.5 text-xs text-gray-600">
+                      <label className="flex items-center gap-2 font-semibold cursor-pointer">
+                        <input type="checkbox" defaultChecked className="rounded text-indigo-600 focus:ring-indigo-500" />
+                        <span>Manage & Edit Orders</span>
+                      </label>
+                      <label className="flex items-center gap-2 font-semibold cursor-pointer">
+                        <input type="checkbox" defaultChecked={role.name === "Super Admin" || role.name === "Sales Manager"} className="rounded text-indigo-600 focus:ring-indigo-500" />
+                        <span>Add & Modify Products</span>
+                      </label>
+                      <label className="flex items-center gap-2 font-semibold cursor-pointer">
+                        <input type="checkbox" defaultChecked={role.name === "Super Admin"} className="rounded text-indigo-600 focus:ring-indigo-500" />
+                        <span>Alter Pixels & Tracking</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert(lang === "bn" ? "রোল এবং পারমিশন সফলভাবে আপডেট করা হয়েছে!" : "Privileges updated for role!");
+                    }}
+                    className="w-full bg-white hover:bg-indigo-50 text-indigo-700 font-bold text-xs py-2 rounded-xl border border-indigo-100 transition-all cursor-pointer"
+                  >
+                    Update Privileges
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER USERS */}
+      {activeTab === "users" && (
+        <div className="space-y-6 animate-fade-in animate-duration-200">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন স্টাফ প্রোফাইল অ্যাড করুন" : "Register Admin Staff Account"}</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newStaffEmail) return;
+                const newUser = {
+                  email: newStaffEmail,
+                  role: newStaffRole,
+                  status: "Active",
+                  lastLogin: "Never"
+                };
+                setAdminUsers([...adminUsers, newUser]);
+                setNewStaffEmail("");
+                alert(lang === "bn" ? "স্টাফ সফলভাবে রেজিস্টার করা হয়েছে!" : "Staff registered successfully!");
+              }} className="space-y-3 font-sans">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Staff Email ID</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. staff@gms.com"
+                    value={newStaffEmail}
+                    onChange={(e) => setNewStaffEmail(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Assigned Role</label>
+                  <select
+                    value={newStaffRole}
+                    onChange={(e) => setNewStaffRole(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                  >
+                    <option value="Sales Manager">Sales Manager</option>
+                    <option value="Delivery Partner">Delivery Partner</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  ➕ Register Staff Profile
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Authorized Admin User Directory</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                      <th className="pb-3">EMAIL ID</th>
+                      <th className="pb-3">ASSIGNED ROLE</th>
+                      <th className="pb-3">LAST SIGN-IN</th>
+                      <th className="pb-3">ACCOUNT STATUS</th>
+                      <th className="pb-3 text-right">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-gray-700 font-medium font-sans">
+                    {adminUsers.map((u, i) => (
+                      <tr key={i}>
+                        <td className="py-3 font-bold text-gray-900">{u.email}</td>
+                        <td className="py-3">
+                          <span className="bg-indigo-50 text-[#3730a3] border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold">{u.role}</span>
+                        </td>
+                        <td className="py-3 text-gray-400 font-semibold font-mono">{u.lastLogin}</td>
+                        <td className="py-3">
+                          <span className="bg-green-50 text-green-700 font-bold text-[9px] px-2.5 py-0.5 rounded-full border border-green-100">{u.status}</span>
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const confirmed = window.confirm(`Reset credentials for ${u.email}?`);
+                              if (confirmed) {
+                                alert("Simulation: A verification PIN reset link has been dispatched.");
+                              }
+                            }}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-2 py-1 rounded text-[10px] cursor-pointer"
+                          >
+                            Reset credentials
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+        </div> {/* Closes MAIN PANEL CONTENT BODY */}
+      </div> {/* Closes RIGHT MAIN PANEL */}
     </div>
   );
 }
