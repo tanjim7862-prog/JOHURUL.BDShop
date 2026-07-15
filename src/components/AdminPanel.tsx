@@ -4829,6 +4829,9 @@ export default function AdminPanel({
                         }
 
                         // Formulate WhatsApp API url
+                        const secureToken = btoa(`${printingOrder.id}-${printingOrder.createdAt || "secure-seed"}`).replace(/=/g, '');
+                        const singlePrintUrl = `${window.location.origin}${window.location.pathname}?print_order_id=${printingOrder.id}&print_supplier=${encodeURIComponent(shopName)}&token=${secureToken}`;
+
                         const waText = (() => {
                           const itemsSummary = itemsForThisShop.map(item => {
                             const prod = products.find(p => p.id === item.product.id) || item.product;
@@ -4845,8 +4848,8 @@ export default function AdminPanel({
                           });
 
                           return lang === "bn" 
-                            ? encodeURIComponent(`*📦 সরবরাহ অর্ডার স্লিপ - ${shopName.toUpperCase()}*\n\n*অর্ডার আইডি:* #${printingOrder.id}\n*তারিখ:* ${orderDate}\n\n*গ্রাহকের বিবরণ:*\n- নাম: ${printingOrder.customerName}\n- মোবাইল: ${printingOrder.customerPhone}\n- ঠিকানা: ${printingOrder.customerAddress}\n- থানা: ${printingOrder.customerThana || "N/A"}\n- জেলা: ${printingOrder.customerDistrict}\n\n*পণ্য বিবরণী:*\n${itemsSummary}\n\nদয়া করে পার্সেলটি প্যাকেট করে দ্রুত ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`)
-                            : encodeURIComponent(`*📦 NEW ORDER DISPATCH REQUEST - ${shopName.toUpperCase()}*\n\n*Order ID:* #${printingOrder.id}\n*Date:* ${orderDate}\n\n*Customer Details:*\n- Name: ${printingOrder.customerName}\n- Phone: ${printingOrder.customerPhone}\n- Address: ${printingOrder.customerAddress}\n- Thana: ${printingOrder.customerThana || "N/A"}\n- District: ${printingOrder.customerDistrict}\n\n*Ordered Items:*\n${itemsSummary}\n\nPlease package and prepare these products for delivery. Thank you!`);
+                            ? encodeURIComponent(`*📦 সরবরাহ অর্ডার স্লিপ - ${shopName.toUpperCase()}*\n\n*অর্ডার আইডি:* #${printingOrder.id}\n*তারিখ:* ${orderDate}\n\n🖨️ *রসিদ ও লেবেল সরাসরি প্রিন্ট করার সিকিউর লিংক (Direct Print Link):*\n${singlePrintUrl}\n\n*গ্রাহকের বিবরণ:*\n- নাম: ${printingOrder.customerName}\n- মোবাইল: ${printingOrder.customerPhone}\n- ঠিকানা: ${printingOrder.customerAddress}\n- থানা: ${printingOrder.customerThana || "N/A"}\n- জেলা: ${printingOrder.customerDistrict}\n\n*পণ্য বিবরণী:*\n${itemsSummary}\n\nদয়া করে প্রিন্ট করা রসিদ পণ্যটির সাথে সংযুক্ত করে দ্রুত ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`)
+                            : encodeURIComponent(`*📦 NEW ORDER DISPATCH REQUEST - ${shopName.toUpperCase()}*\n\n*Order ID:* #${printingOrder.id}\n*Date:* ${orderDate}\n\n🖨️ *Direct Secure Link to Print and Attach Slip:*\n${singlePrintUrl}\n\n*Customer Details:*\n- Name: ${printingOrder.customerName}\n- Phone: ${printingOrder.customerPhone}\n- Address: ${printingOrder.customerAddress}\n- Thana: ${printingOrder.customerThana || "N/A"}\n- District: ${printingOrder.customerDistrict}\n\n*Ordered Items:*\n${itemsSummary}\n\nPlease print the slip, attach it to the product, and prepare for delivery. Thank you!`);
                         })();
 
                         const waLink = `https://api.whatsapp.com/send?phone=${formattedPhoneForWa}&text=${waText}`;
@@ -4892,20 +4895,42 @@ export default function AdminPanel({
                               />
                             </div>
 
-                            {/* WhatsApp Button */}
-                            <a
-                              href={waLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`w-full py-2 px-4 rounded-xl font-extrabold text-xs text-white transition-all flex items-center justify-center gap-1.5 shadow-sm ${
-                                formattedPhoneForWa 
-                                  ? "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md cursor-pointer" 
-                                  : "bg-gray-300 pointer-events-none cursor-not-allowed"
-                              }`}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              <span>{lang === "bn" ? "১-ক্লিকে ওয়াটসঅ্যাপে পাঠান" : "Send slip on WhatsApp"}</span>
-                            </a>
+                            {/* WhatsApp Button and Quick Print/Copy Actions */}
+                            <div className="space-y-2">
+                              <a
+                                href={waLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`w-full py-2 px-4 rounded-xl font-extrabold text-xs text-white transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                                  formattedPhoneForWa 
+                                    ? "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md cursor-pointer" 
+                                    : "bg-gray-300 pointer-events-none cursor-not-allowed"
+                                }`}
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                <span>{lang === "bn" ? "১-ক্লিকে ওয়াটসঅ্যাপে পাঠান" : "Send slip on WhatsApp"}</span>
+                              </a>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => window.open(singlePrintUrl, "_blank")}
+                                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[10px] font-black py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200"
+                                >
+                                  🖨️ {lang === "bn" ? "প্রিন্ট স্লিপ" : "Print Slip"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(singlePrintUrl);
+                                    alert(lang === "bn" ? "প্রিন্ট লিংক কপি করা হয়েছে!" : "Direct print link copied!");
+                                  }}
+                                  className="bg-slate-50 hover:bg-slate-100 text-slate-800 text-[10px] font-black py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                                >
+                                  🔗 {lang === "bn" ? "লিংক কপি" : "Copy Link"}
+                                </button>
+                              </div>
+                            </div>
                             {!formattedPhoneForWa && (
                               <p className="text-[9px] text-red-500 text-center font-bold">
                                 ⚠️ {lang === "bn" ? "ওয়াটসঅ্যাপ বাটন চালু করতে নম্বরটি দিন" : "Enter WhatsApp number to enable button"}

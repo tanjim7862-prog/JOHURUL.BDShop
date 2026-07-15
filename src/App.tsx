@@ -967,14 +967,35 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const supplier = params.get("print_supplier");
     const date = params.get("print_date");
+    const orderId = params.get("print_order_id");
+    const token = params.get("token");
+
+    if (orderId) {
+      return { orderId, supplier, token, type: "single" as const };
+    }
     if (supplier && date) {
-      return { supplier, date };
+      return { supplier, date, type: "batch" as const };
     }
     return null;
   }, []);
 
+  const isTokenValid = useMemo(() => {
+    if (!printParams || printParams.type !== "single") return true;
+    const found = orders.find(o => o.id === printParams.orderId);
+    if (!found) return false;
+    const expectedToken = btoa(`${found.id}-${found.createdAt || "secure-seed"}`).replace(/=/g, '');
+    return printParams.token === expectedToken;
+  }, [printParams, orders]);
+
   const matchingPrintOrders = useMemo(() => {
     if (!printParams) return [];
+    
+    if (printParams.type === "single") {
+      if (!isTokenValid) return [];
+      const found = orders.find(o => o.id === printParams.orderId);
+      return found ? [found] : [];
+    }
+
     return orders.filter(order => {
       // Check date match
       const isDateOk = (() => {
@@ -994,15 +1015,57 @@ export default function App() {
       // Check supplier match
       return order.cartItems.some(item => {
         const prod = products.find(p => p.id === item.product.id) || item.product;
-        return (prod.supplierShop || "").trim().toLowerCase() === printParams.supplier.trim().toLowerCase();
+        return (prod.supplierShop || "").trim().toLowerCase() === printParams.supplier!.trim().toLowerCase();
       });
     });
-  }, [printParams, orders, products]);
+  }, [printParams, orders, products, isTokenValid]);
 
   if (printParams) {
-    const formattedDate = new Date(printParams.date).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    });
+    if (printParams.type === "single" && !isTokenValid) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-white">
+          <div className="max-w-md w-full bg-slate-900 border border-slate-850 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-red-500 via-amber-500 to-red-500"></div>
+            <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto text-3xl font-bold mb-4 border border-red-500/20">
+              🔒
+            </div>
+            <h2 className="text-xl font-black tracking-tight text-white">
+              {lang === "bn" ? "রসিদ স্লিপ এক্সেস লকড" : "Access Denied / Invalid Token"}
+            </h2>
+            <p className="text-xs text-slate-400 mt-2 font-semibold leading-relaxed">
+              {lang === "bn"
+                ? "এই রসিদ স্লিপ লিংকটি অবৈধ অথবা মেয়াদোত্তীর্ণ হয়েছে। শপ অনারকে একটি নতুন স্লিপ রিকোয়েস্ট লিংক পাঠাতে বলুন।"
+                : "This order receipt link has an invalid or expired secure signature. Please ask the shop admin to dispatch a fresh print link."}
+            </p>
+            <div className="mt-6">
+              <button
+                onClick={() => {
+                  window.location.href = window.location.origin + window.location.pathname;
+                }}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-3 rounded-2xl transition-all border border-slate-750 cursor-pointer"
+              >
+                {lang === "bn" ? "হোম পেজে যান" : "Go to Storefront"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const formattedDate = (() => {
+      if (printParams.type === "single") {
+        const order = matchingPrintOrders[0];
+        if (!order) return "";
+        return new Date(order.createdAt).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
+          year: 'numeric', month: 'long', day: 'numeric'
+        });
+      }
+      return new Date(printParams.date!).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    })();
+
+    const displaySupplier = printParams.supplier || (matchingPrintOrders[0] ? "Multiple" : "N/A");
 
     return (
       <div className="min-h-screen bg-slate-100 p-4 sm:p-8 font-sans text-gray-900 print:bg-white print:p-0">
@@ -1038,8 +1101,8 @@ export default function App() {
             </div>
             <p className="text-xs text-gray-500 mt-1 font-bold">
               {lang === "bn"
-                ? `শপ: ${printParams.supplier.toUpperCase()} | তারিখ: ${formattedDate}`
-                : `Shop: ${printParams.supplier.toUpperCase()} | Date: ${formattedDate}`}
+                ? `শপ: ${displaySupplier.toUpperCase()} | তারিখ: ${formattedDate}`
+                : `Shop: ${displaySupplier.toUpperCase()} | Date: ${formattedDate}`}
               {" "}({matchingPrintOrders.length} {lang === "bn" ? "টি পার্সেল পাওয়া গেছে" : "parcels found"})
             </p>
           </div>
@@ -1079,6 +1142,7 @@ export default function App() {
             matchingPrintOrders.map((order, idx) => {
               // Filter cart items to only show products belonging to THIS supplier
               const supplierItems = order.cartItems.filter(item => {
+                if (!printParams.supplier) return true;
                 const prod = products.find(p => p.id === item.product.id) || item.product;
                 return (prod.supplierShop || "").trim().toLowerCase() === printParams.supplier.trim().toLowerCase();
               });
@@ -1100,7 +1164,9 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                        {lang === "bn" ? `সরবরাহকারী: ${printParams.supplier}` : `Supplier: ${printParams.supplier}`}
+                        {printParams.supplier 
+                          ? (lang === "bn" ? `সরবরাহকারী: ${printParams.supplier}` : `Supplier: ${printParams.supplier}`)
+                          : (lang === "bn" ? "সকল সরবরাহকারী" : "All Suppliers")}
                       </p>
                     </div>
 
