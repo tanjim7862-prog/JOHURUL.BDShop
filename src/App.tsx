@@ -4,6 +4,7 @@ import { INITIAL_PRODUCTS, BANGLADESH_DIVISIONS, DIVISION_TO_DISTRICTS, DISTRICT
 import ProductCard from "./components/ProductCard";
 import FlashSale from "./components/FlashSale";
 import FilterSidebar, { FilterSettings } from "./components/FilterSidebar";
+import ProductDetails from "./components/ProductDetails";
 import TrackingTimeline from "./components/TrackingTimeline";
 import FacebookAdPreview from "./components/FacebookAdPreview";
 import AdminPanel from "./components/AdminPanel";
@@ -334,6 +335,15 @@ export default function App() {
   // Marketing Pixel Settings States
   const [fbPixelId, setFbPixelId] = useState<string>(() => localStorage.getItem("mystore_fb_pixel") || "");
   const [ttPixelId, setTtPixelId] = useState<string>(() => localStorage.getItem("mystore_tt_pixel") || "");
+  const [whatsappNumber, setWhatsappNumber] = useState<string>(() => localStorage.getItem("mystore_whatsapp") || "8801795339373");
+
+  useEffect(() => {
+    if (whatsappNumber) {
+      localStorage.setItem("mystore_whatsapp", whatsappNumber);
+    } else {
+      localStorage.removeItem("mystore_whatsapp");
+    }
+  }, [whatsappNumber]);
 
   // Hero Banner image state customizable by Admin
   const [heroImageUrl, setHeroImageUrl] = useState<string>(() => {
@@ -496,11 +506,23 @@ export default function App() {
   }, [products, lang, coupons]);
 
   // Cart operations
-  const handleAddToCart = (product: Product, quantity: number = 1) => {
+  const handleAddToCart = (
+    product: Product, 
+    quantity: number = 1, 
+    selectedSize?: string, 
+    selectedColor?: string, 
+    price?: number
+  ) => {
     if (product.stock === 0) return;
 
+    const finalPrice = price !== undefined ? price : (product.isFlashSale && product.flashSalePrice ? product.flashSalePrice : product.price);
+
     setCart((prevCart) => {
-      const existingIdx = prevCart.findIndex((item) => item.product.id === product.id);
+      const existingIdx = prevCart.findIndex((item) => 
+        item.product.id === product.id && 
+        item.selectedSize === selectedSize && 
+        item.selectedColor === selectedColor
+      );
       if (existingIdx > -1) {
         const newQty = prevCart[existingIdx].quantity + quantity;
         if (newQty > product.stock) return prevCart; // Exceeds stock
@@ -508,7 +530,7 @@ export default function App() {
         updated[existingIdx] = { ...updated[existingIdx], quantity: newQty };
         return updated;
       } else {
-        return [...prevCart, { product, quantity }];
+        return [...prevCart, { product, quantity, selectedSize, selectedColor, price: finalPrice }];
       }
     });
 
@@ -516,7 +538,7 @@ export default function App() {
     trackPixelEvent("AddToCart", {
       content_name: product.name,
       content_ids: [product.id],
-      value: product.price * quantity,
+      value: finalPrice * quantity,
       currency: "BDT"
     });
 
@@ -528,16 +550,27 @@ export default function App() {
     setTimeout(() => toast.remove(), 2500);
   };
 
-  const handleOrderNow = (product: Product) => {
+  const handleOrderNow = (
+    product: Product, 
+    selectedSize?: string, 
+    selectedColor?: string, 
+    price?: number
+  ) => {
     if (product.stock === 0) return;
 
-    // Check if product is already in cart, if not, add it
+    const finalPrice = price !== undefined ? price : (product.isFlashSale && product.flashSalePrice ? product.flashSalePrice : product.price);
+
+    // Check if product is already in cart with same variations, if not, add it
     setCart((prevCart) => {
-      const existingIdx = prevCart.findIndex((item) => item.product.id === product.id);
+      const existingIdx = prevCart.findIndex((item) => 
+        item.product.id === product.id && 
+        item.selectedSize === selectedSize && 
+        item.selectedColor === selectedColor
+      );
       if (existingIdx > -1) {
         return prevCart;
       } else {
-        return [...prevCart, { product, quantity: 1 }];
+        return [...prevCart, { product, quantity: 1, selectedSize, selectedColor, price: finalPrice }];
       }
     });
 
@@ -545,7 +578,7 @@ export default function App() {
     trackPixelEvent("AddToCart", {
       content_name: product.name,
       content_ids: [product.id],
-      value: product.price,
+      value: finalPrice,
       currency: "BDT"
     });
 
@@ -555,10 +588,14 @@ export default function App() {
     setIsCheckoutOpen(true);
   };
 
-  const handleUpdateCartQty = (productId: string, delta: number) => {
+  const handleUpdateCartQty = (productId: string, delta: number, selectedSize?: string, selectedColor?: string) => {
     setCart((prevCart) => {
       return prevCart.map((item) => {
-        if (item.product.id === productId) {
+        if (
+          item.product.id === productId &&
+          item.selectedSize === selectedSize &&
+          item.selectedColor === selectedColor
+        ) {
           const newQty = item.quantity + delta;
           if (newQty <= 0) return null;
           if (newQty > item.product.stock) return item; // Exceeds stock
@@ -569,12 +606,16 @@ export default function App() {
     });
   };
 
-  const handleRemoveFromCart = (productId: string) => {
-    setCart((prevCart) => prevCart.filter((item) => item.product.id !== productId));
+  const handleRemoveFromCart = (productId: string, selectedSize?: string, selectedColor?: string) => {
+    setCart((prevCart) => prevCart.filter((item) => 
+      !(item.product.id === productId && 
+        item.selectedSize === selectedSize && 
+        item.selectedColor === selectedColor)
+    ));
   };
 
   // Cart math
-  const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.price !== undefined ? item.price : (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price)) * item.quantity, 0);
   
   // Find matching active coupon
   const matchedCoupon = useMemo(() => {
@@ -616,7 +657,7 @@ export default function App() {
         contents: cart.map(item => ({
           id: item.product.id,
           quantity: item.quantity,
-          item_price: item.product.price,
+          item_price: item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price),
           name: item.product.name
         }))
       });
@@ -758,8 +799,15 @@ export default function App() {
     
     cart.forEach((item, index) => {
       const prodName = lang === "bn" ? (item.product.banglaName || item.product.name) : item.product.name;
+      const itemPrice = item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
       waMessage += `${index + 1}. *${prodName}*\n`;
-      waMessage += `   - পরিমাণ (Qty): ${item.quantity} x ৳${item.product.price}\n`;
+      waMessage += `   - পরিমাণ (Qty): ${item.quantity} x ৳${itemPrice}\n`;
+      if (item.selectedSize) {
+        waMessage += `   - সাইজ (Size): ${item.selectedSize}\n`;
+      }
+      if (item.selectedColor) {
+        waMessage += `   - কালার (Color): ${item.selectedColor}\n`;
+      }
       if (item.product.image) {
         waMessage += `   - ছবি (Image URL): ${item.product.image}\n`;
       }
@@ -773,7 +821,7 @@ export default function App() {
     waMessage += `ধন্যবাদ! (Thank you for ordering from JOHURUL.BDShop)`;
 
     const encodedMessage = encodeURIComponent(waMessage);
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=8801795339373&text=${encodedMessage}`;
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodedMessage}`;
 
     // Track Purchase event with Facebook/TikTok pixels
     trackPixelEvent("Purchase", {
@@ -783,7 +831,7 @@ export default function App() {
       contents: cart.map(item => ({
         id: item.product.id,
         quantity: item.quantity,
-        item_price: item.product.price,
+        item_price: item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price),
         name: item.product.name
       }))
     });
@@ -1564,6 +1612,8 @@ export default function App() {
                   onChangeHeroImageUrl={setHeroImageUrl}
                   coupons={coupons}
                   onUpdateCoupons={setCoupons}
+                  whatsappNumber={whatsappNumber}
+                  onChangeWhatsappNumber={setWhatsappNumber}
                 />
               </div>
             )}
@@ -1574,209 +1624,16 @@ export default function App() {
 
       {/* DETAIL MODAL: Product Details */}
       {selectedProductDetails && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-gray-100">
-            
-            {/* Close button */}
-            <button
-              id="close-details-modal"
-              onClick={() => setSelectedProductDetails(null)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 rounded-full transition-colors z-10 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Modal Body */}
-            <div className="grid grid-cols-1 md:grid-cols-2">
-              {/* Left Photo */}
-              <div className="aspect-square relative bg-gray-50">
-                <img
-                  src={selectedProductDetails.image}
-                  alt={selectedProductDetails.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-
-              {/* Right Specs */}
-              <div className="p-6 sm:p-8 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-[10px] font-bold text-[#3730a3] bg-[#3730a3]/10 px-2.5 py-1 rounded-md uppercase">
-                      {selectedProductDetails.category}
-                    </span>
-                    <h3 className="text-xl sm:text-indigo-900lue-600xl font-black text-gray-900 mt-2">
-                      {lang === "bn" 
-                        ? selectedProductDetails.banglaName || selectedProductDetails.name 
-                        : selectedProductDetails.name}
-                    </h3>
-                  </div>
-
-                  {/* Rating block */}
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-bold text-gray-800">{selectedProductDetails.rating}</span>
-                    <div className="flex text-blue-800mber-400">
-                      {[...Array(5)].map((_, i) => (
-                        <span key={i}>★</span>
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-400">({selectedProductDetails.reviewsCount} {lang === "bn" ? "রিভিউ" : "Reviews"})</span>
-                  </div>
-
-                  {/* Pricing */}
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-indigo-900lue-600xl font-extrabold text-[#3730a3]">৳{selectedProductDetails.price}</span>
-                    {selectedProductDetails.originalPrice && (
-                      <span className="text-sm text-gray-400 line-through">৳{selectedProductDetails.originalPrice}</span>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{lang === "bn" ? "পণ্য পরিচিতি" : "Description"}</h4>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      {lang === "bn" 
-                        ? selectedProductDetails.banglaDescription || selectedProductDetails.description 
-                        : selectedProductDetails.description}
-                    </p>
-                  </div>
-
-                  {/* Security Highlights */}
-                  <div className="bg-[#3730a3]/5 border border-[#3730a3]/10 p-3 rounded-xl space-y-1.5 text-xs">
-                    <div className="flex items-center gap-2 text-[#3730a3] font-bold">
-                      <ShieldCheck className="w-4 h-4 text-[#3730a3]" />
-                      <span>{lang === "bn" ? "ক্যাশ অন ডেলিভারি (COD) এভেলেবল" : "Cash on Delivery Available"}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-500 pl-6">
-                      {lang === "bn" 
-                        ? "সারা বাংলাদেশে পণ্য হাতে পেয়ে টাকা পরিশোধ করুন। লাইভ অর্ডার ট্র্যাকিং লিংক প্রদান করা হবে।" 
-                        : "No advance payment required. Inspect parcel then pay courier. Tracking ID included."}
-                    </p>
-                  </div>
-                </div>
-
-                 {/* Add to Cart Footer inside modal */}
-                <div className="mt-8 pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                  <div className="text-xs shrink-0">
-                    <p className="text-gray-400 font-semibold">{lang === "bn" ? "স্টক অবস্থা:" : "Availability:"}</p>
-                    {selectedProductDetails.stock > 0 ? (
-                      <span className="text-[#3730a3] font-bold">{lang === "bn" ? `${selectedProductDetails.stock} পিস স্টক আছে` : `${selectedProductDetails.stock} items remaining`}</span>
-                    ) : (
-                      <span className="text-indigo-900lue-600lue-600 font-bold">{lang === "bn" ? "স্টক শেষ" : "Out of Stock"}</span>
-                    )}
-                  </div>
-
-                  <div className="flex-1 flex flex-col sm:flex-row gap-2">
-                    <button
-                      id="modal-add-to-cart-btn"
-                      disabled={selectedProductDetails.stock === 0}
-                      onClick={() => {
-                        handleAddToCart(selectedProductDetails, 1);
-                        setSelectedProductDetails(null);
-                      }}
-                      className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-200 text-gray-700 font-bold text-xs sm:text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-gray-200"
-                    >
-                      <ShoppingCart className="w-4 h-4 text-gray-500" />
-                      <span>{lang === "bn" ? "কার্টে যোগ করুন" : "Add to Cart"}</span>
-                    </button>
-
-                    <button
-                      id="modal-order-now-btn"
-                      disabled={selectedProductDetails.stock === 0}
-                      onClick={() => {
-                        handleOrderNow(selectedProductDetails);
-                      }}
-                      className="flex-1 bg-[#3730a3] hover:bg-[#4338ca] disabled:bg-gray-300 text-white font-black text-xs sm:text-sm py-3 px-5 rounded-xl flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer uppercase tracking-wider"
-                    >
-                      <span>🛍️</span>
-                      <span>{lang === "bn" ? "অর্ডার করুন" : "ORDER NOW"}</span>
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Extended Landing Page Content (Images & Descriptions) */}
-            {(selectedProductDetails.landingDescription || 
-              selectedProductDetails.banglaLandingDescription || 
-              (selectedProductDetails.images && selectedProductDetails.images.filter(img => img).length > 0)) && (
-              <div className="border-t border-gray-100 bg-gray-50/50 p-6 sm:p-8 space-y-8">
-                
-                {/* Visual Section Header */}
-                <div className="text-center space-y-2">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-[#3730a3] text-xs font-bold uppercase tracking-wider">
-                    <span>✨</span>
-                    {lang === "bn" ? "বিস্তারিত পণ্য পরিচিতি ও গ্যালারি" : "Detailed Presentation & Gallery"}
-                  </div>
-                  <h4 className="text-lg font-black text-gray-900">
-                    {lang === "bn" ? "কেন এই পণ্যটি আপনার জন্য সেরা?" : "Why this is the perfect choice for you?"}
-                  </h4>
-                </div>
-
-                {/* Long Landing Description */}
-                {(selectedProductDetails.landingDescription || selectedProductDetails.banglaLandingDescription) && (
-                  <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-sm leading-relaxed text-gray-600 text-xs sm:text-sm space-y-3">
-                    <p className="whitespace-pre-line">
-                      {lang === "bn" 
-                        ? selectedProductDetails.banglaLandingDescription || selectedProductDetails.landingDescription 
-                        : selectedProductDetails.landingDescription}
-                    </p>
-                  </div>
-                )}
-
-                {/* Grid of Auxiliary Images */}
-                {selectedProductDetails.images && selectedProductDetails.images.filter(img => img).length > 0 && (
-                  <div className="space-y-4">
-                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">
-                      {lang === "bn" ? "পণ্যটির বাস্তবসম্মত কিছু চিত্র" : "Product Features & Highlights Showcase"}
-                    </h5>
-                    
-                    {/* List/Grid of images */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {selectedProductDetails.images.filter(img => img).map((imgUrl, i) => (
-                        <div key={i} className="overflow-hidden rounded-2xl border border-gray-100 shadow-sm bg-white aspect-video relative group">
-                          <img 
-                            src={imgUrl} 
-                            alt={`${selectedProductDetails.name} showcase ${i + 1}`} 
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                            {lang === "bn" ? `বৈশিষ্ট্য ${i + 1}` : `Feature ${i + 1}`}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Sticky Order Action Shortcut inside the Landing section to increase conversions! */}
-                <div className="bg-[#3730a3] rounded-2xl p-6 text-white text-center space-y-4 shadow-xl">
-                  <h5 className="text-sm font-black uppercase tracking-wider">
-                    {lang === "bn" ? "আজই অর্ডার করুন, স্টক সীমিত!" : "Order today, limited stock remaining!"}
-                  </h5>
-                  <p className="text-xs text-indigo-100 max-w-md mx-auto">
-                    {lang === "bn" 
-                      ? "পণ্যটি পেতে নিচে বাটনে ক্লিক করুন এবং আপনার নাম, ঠিকানা ও মোবাইল নম্বর দিয়ে অর্ডার সাবমিট করুন।" 
-                      : "Click below to secure your items. Cash on delivery is fully supported throughout Bangladesh!"}
-                  </p>
-                  <button
-                    onClick={() => {
-                      handleOrderNow(selectedProductDetails);
-                    }}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white text-[#3730a3] hover:bg-gray-50 font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl shadow-lg transition-all cursor-pointer uppercase tracking-wider"
-                  >
-                    <span>🛍️</span>
-                    <span>{lang === "bn" ? "সরাসরি ক্যাশ অন ডেলিভারিতে কিনুন" : "Order Cash on Delivery Now"}</span>
-                  </button>
-                </div>
-
-              </div>
-            )}
-
-          </div>
-        </div>
+        <ProductDetails
+          product={selectedProductDetails}
+          lang={lang}
+          onClose={() => setSelectedProductDetails(null)}
+          onAddToCart={handleAddToCart}
+          onOrderNow={handleOrderNow}
+          wishlistIds={wishlist}
+          onToggleWishlist={handleToggleWishlist}
+          whatsappNumber={whatsappNumber}
+        />
       )}
 
       {/* SHOPPING CART DRAWER */}
@@ -1819,54 +1676,76 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                cart.map((item) => (
-                  <div key={item.product.id} className="flex gap-4 p-3 bg-gray-50 border border-gray-100 rounded-lg relative group">
-                    <img
-                      src={item.product.image}
-                      alt={item.product.name}
-                      className="w-16 h-16 rounded object-cover border border-gray-100 shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
+                cart.map((item) => {
+                  const itemKey = `${item.product.id}-${item.selectedSize || ""}-${item.selectedColor || ""}`;
+                  const itemPrice = item.price !== undefined ? item.price : (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+                  
+                  return (
+                    <div key={itemKey} className="flex gap-4 p-3 bg-gray-50 border border-gray-100 rounded-lg relative group">
+                      <img
+                        src={item.product.image}
+                        alt={item.product.name}
+                        className="w-16 h-16 rounded object-cover border border-gray-100 shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
 
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-sm truncate">
-                          {lang === "bn" ? item.product.banglaName || item.product.name : item.product.name}
-                        </h4>
-                        <span className="text-xs text-gray-400 font-semibold block mt-0.5">৳{item.product.price}</span>
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-sm truncate">
+                            {lang === "bn" ? item.product.banglaName || item.product.name : item.product.name}
+                          </h4>
+                          
+                          {/* Variations indicators */}
+                          {(item.selectedSize || item.selectedColor) && (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {item.selectedSize && (
+                                <span className="text-[9px] font-black bg-[#3730a3]/5 text-[#3730a3] px-1.5 py-0.5 rounded-md">
+                                  {lang === "bn" ? `সাইজ: ${item.selectedSize}` : `Size: ${item.selectedSize}`}
+                                </span>
+                              )}
+                              {item.selectedColor && (
+                                <span className="text-[9px] font-black bg-[#3730a3]/5 text-[#3730a3] px-1.5 py-0.5 rounded-md">
+                                  {lang === "bn" ? `রঙ: ${item.selectedColor}` : `Color: ${item.selectedColor}`}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <span className="text-xs text-gray-500 font-bold block mt-1">৳{itemPrice}</span>
+                        </div>
+
+                        {/* Quantity selector */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <button
+                            id={`dec-qty-${itemKey}`}
+                            onClick={() => handleUpdateCartQty(item.product.id, -1, item.selectedSize, item.selectedColor)}
+                            className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md cursor-pointer"
+                          >
+                            <Minus className="w-3 h-3 text-gray-600" />
+                          </button>
+                          <span className="text-xs font-bold text-gray-800 w-4 text-center">{item.quantity}</span>
+                          <button
+                            id={`inc-qty-${itemKey}`}
+                            onClick={() => handleUpdateCartQty(item.product.id, 1, item.selectedSize, item.selectedColor)}
+                            className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3 text-gray-600" />
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Quantity selector */}
-                      <div className="flex items-center gap-2 mt-1">
-                        <button
-                          id={`dec-qty-${item.product.id}`}
-                          onClick={() => handleUpdateCartQty(item.product.id, -1)}
-                          className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md"
-                        >
-                          <Minus className="w-3 h-3 text-gray-600" />
-                        </button>
-                        <span className="text-xs font-bold text-gray-800 w-4 text-indigo-900enter">{item.quantity}</span>
-                        <button
-                          id={`inc-qty-${item.product.id}`}
-                          onClick={() => handleUpdateCartQty(item.product.id, 1)}
-                          className="p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-md"
-                        >
-                          <Plus className="w-3 h-3 text-gray-600" />
-                        </button>
-                      </div>
+                      {/* Delete button */}
+                      <button
+                        id={`remove-item-${itemKey}`}
+                        onClick={() => handleRemoveFromCart(item.product.id, item.selectedSize, item.selectedColor)}
+                        className="absolute top-3 right-3 text-gray-400 hover:text-[#3730a3] transition-colors cursor-pointer"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-
-                    {/* Delete button */}
-                    <button
-                      id={`remove-item-${item.product.id}`}
-                      onClick={() => handleRemoveFromCart(item.product.id)}
-                      className="absolute top-3 right-3 text-gray-400 hover:text-[#3730a3] transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

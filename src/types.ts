@@ -19,6 +19,8 @@ export interface Product {
   salesCount?: number;
   isFlashSale?: boolean;
   flashSalePrice?: number;
+  sizes?: string[];
+  colors?: { name: string; hex: string }[];
 }
 
 export enum OrderStatus {
@@ -43,6 +45,9 @@ export interface TrackingStep {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedSize?: string;
+  selectedColor?: string;
+  price?: number;
 }
 
 export interface Coupon {

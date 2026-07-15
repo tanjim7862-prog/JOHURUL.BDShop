@@ -15,7 +15,12 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewsCount: 142,
     stock: 25,
     badge: "new",
-    salesCount: 280
+    salesCount: 280,
+    colors: [
+      { name: "Black", hex: "#1f2937" },
+      { name: "Deep Brown", hex: "#451a03" },
+      { name: "Tan Vintage", hex: "#b45309" }
+    ]
   },
   {
     id: "2",
@@ -33,7 +38,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     badge: "hot",
     isFlashSale: true,
     flashSalePrice: 2190,
-    salesCount: 450
+    salesCount: 450,
+    colors: [
+      { name: "Glossy White", hex: "#f8fafc" },
+      { name: "Matte Black", hex: "#0f172a" }
+    ]
   },
   {
     id: "3",
@@ -51,7 +60,12 @@ export const INITIAL_PRODUCTS: Product[] = [
     badge: "sale",
     isFlashSale: true,
     flashSalePrice: 2890,
-    salesCount: 520
+    salesCount: 520,
+    colors: [
+      { name: "Carbon Grey", hex: "#475569" },
+      { name: "Space Black", hex: "#020617" },
+      { name: "Rose Gold", hex: "#fda4af" }
+    ]
   },
   {
     id: "4",
@@ -67,7 +81,14 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewsCount: 312,
     stock: 30,
     badge: "hot",
-    salesCount: 190
+    salesCount: 190,
+    sizes: ["M", "L", "XL", "XXL"],
+    colors: [
+      { name: "Pure White", hex: "#ffffff" },
+      { name: "Navy Blue", hex: "#1e3a8a" },
+      { name: "Olive Green", hex: "#3f6212" },
+      { name: "Maroon Rose", hex: "#991b1b" }
+    ]
   },
   {
     id: "5",
@@ -117,7 +138,13 @@ export const INITIAL_PRODUCTS: Product[] = [
     badge: "hot",
     isFlashSale: true,
     flashSalePrice: 1690,
-    salesCount: 380
+    salesCount: 380,
+    sizes: ["39", "40", "41", "42", "43", "44"],
+    colors: [
+      { name: "Flame Red", hex: "#dc2626" },
+      { name: "Stealth Black", hex: "#111827" },
+      { name: "Triple White", hex: "#f9fafb" }
+    ]
   },
   {
     id: "8",

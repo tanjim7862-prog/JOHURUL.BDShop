@@ -24,6 +24,8 @@ interface AdminPanelProps {
   onChangeHeroImageUrl: (url: string) => void;
   coupons?: Coupon[];
   onUpdateCoupons?: (coupons: Coupon[]) => void;
+  whatsappNumber?: string;
+  onChangeWhatsappNumber?: (num: string) => void;
 }
 
 export default function AdminPanel({
@@ -39,7 +41,9 @@ export default function AdminPanel({
   heroImageUrl,
   onChangeHeroImageUrl,
   coupons = [],
-  onUpdateCoupons
+  onUpdateCoupons,
+  whatsappNumber = "8801795339373",
+  onChangeWhatsappNumber
 }: AdminPanelProps) {
   type AdminTab = 
     | "analytics"
@@ -144,6 +148,10 @@ export default function AdminPanel({
   const [inputFbPixel, setInputFbPixel] = useState(fbPixelId);
   const [inputTtPixel, setInputTtPixel] = useState(ttPixelId);
   const [isPixelSaved, setIsPixelSaved] = useState(false);
+  
+  // Local state for WhatsApp setting
+  const [inputWhatsapp, setInputWhatsapp] = useState(whatsappNumber);
+  const [isWhatsappSaved, setIsWhatsappSaved] = useState(false);
   
   // Local state for banner image settings
   const [inputHeroImage, setInputHeroImage] = useState(heroImageUrl);
@@ -1736,6 +1744,80 @@ export default function AdminPanel({
                   </div>
 
                 </form>
+              </div>
+
+              {/* WhatsApp Configuration Card */}
+              <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex items-center gap-2 pb-4 border-b border-gray-50">
+                  <MessageSquare className="w-5 h-5 text-emerald-600" />
+                  <h4 className="text-lg font-black text-gray-900">
+                    {lang === "bn" ? "হোয়াটসঅ্যাপ কাস্টমার সাপোর্ট এবং অর্ডার" : "WhatsApp Chat & Order Configuration"}
+                  </h4>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {lang === "bn"
+                      ? "কাস্টমার যখন সরাসরি হোয়াটসঅ্যাপে অর্ডার করবে বা চ্যাট করতে চাইবে, তখন আপনার কোন নম্বরে মেসেজ যাবে তা এখানে সেট করুন। নম্বরটি অবশ্যই কান্ট্রি কোড সহ (যেমন: 88017XXXXXXXX) হতে হবে।"
+                      : "Define the phone number where customer WhatsApp chat and automated checkout messages will be routed. Make sure to include the country code (e.g., 88017XXXXXXXX)."}
+                  </p>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (onChangeWhatsappNumber) {
+                        onChangeWhatsappNumber(inputWhatsapp.trim());
+                      }
+                      setIsWhatsappSaved(true);
+                      setTimeout(() => setIsWhatsappSaved(false), 3000);
+                    }}
+                    className="space-y-4"
+                  >
+                    <div className="bg-emerald-50/20 border border-emerald-100/40 p-4 rounded-2xl space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 font-mono font-black text-xs">
+                          💬
+                        </div>
+                        <div>
+                          <span className="text-xs font-black text-gray-800 block">
+                            {lang === "bn" ? "হোয়াটসঅ্যাপ নম্বর (WhatsApp Number)" : "WhatsApp Number"}
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-bold font-mono">{whatsappNumber} (Current)</span>
+                        </div>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={inputWhatsapp}
+                        onChange={(e) => setInputWhatsapp(e.target.value)}
+                        placeholder="e.g. 8801795339373"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-sm font-bold"
+                      />
+
+                      <span className="text-[10px] text-gray-400 block leading-tight">
+                        {lang === "bn"
+                          ? "* কোনো স্পেস, হাইফেন বা '+' ছাড়া শুধু সংখ্যা দিন। উদাহরণ: 8801795339373"
+                          : "* Only enter digits, without spaces, dashes or '+'. Example: 8801795339373"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        type="submit"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl transition-all cursor-pointer shadow-md hover:scale-[1.01] active:scale-[0.99]"
+                      >
+                        {lang === "bn" ? "হোয়াটসঅ্যাপ নম্বর সেভ করুন" : "Save WhatsApp Number"}
+                      </button>
+
+                      {isWhatsappSaved && (
+                        <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold animate-bounce">
+                          <Check className="w-4 h-4" />
+                          <span>{lang === "bn" ? "নম্বরটি সফলভাবে সেভ হয়েছে!" : "Saved successfully!"}</span>
+                        </div>
+                      )}
+                    </div>
+                  </form>
+                </div>
               </div>
 
               {/* Hero Banner Configuration Card */}
