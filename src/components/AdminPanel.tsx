@@ -7,7 +7,7 @@ import {
   X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2,
   LayoutDashboard, Users, CreditCard, Layers, Feather, BookOpen, Image as ImageIcon,
   Activity, Globe, Truck, MessageSquare, Key, Settings, UserCheck, Menu, ChevronRight,
-  ChevronLeft, Search, FileText, Percent
+  ChevronLeft, Search, FileText, Percent, TrendingDown, ArrowUpRight, Sparkles
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -160,6 +160,7 @@ export default function AdminPanel({
   // Product state
   const [isEditingProduct, setIsEditingProduct] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "dead">("all");
 
   // States for Supplier orders sheet export
   const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
@@ -321,7 +322,12 @@ export default function AdminPanel({
         stock: editingProduct.stock !== undefined ? Number(editingProduct.stock) : 10,
         images: editingProduct.images || [],
         landingDescription: editingProduct.landingDescription || "",
-        banglaLandingDescription: editingProduct.banglaLandingDescription || ""
+        banglaLandingDescription: editingProduct.banglaLandingDescription || "",
+        costPrice: editingProduct.costPrice ? Number(editingProduct.costPrice) : undefined,
+        variations: editingProduct.variations || [],
+        seoTitle: editingProduct.seoTitle || "",
+        seoDescription: editingProduct.seoDescription || "",
+        seoKeywords: editingProduct.seoKeywords || ""
       };
       onUpdateProducts([newProduct, ...products]);
     }
@@ -476,6 +482,22 @@ export default function AdminPanel({
     { id: "roles", labelBn: "অ্যাডমিন রোলস", labelEn: "Roles", icon: Key },
     { id: "users", labelBn: "ইউজার লিস্ট", labelEn: "Users", icon: Settings },
   ];
+
+  // Stock / Inventory calculations
+  const totalStockItems = products.reduce((acc, p) => acc + p.stock, 0);
+  const totalRetailValuation = products.reduce((acc, p) => acc + (p.price * p.stock), 0);
+  const totalCostValuation = products.reduce((acc, p) => {
+    const cost = p.costPrice !== undefined ? p.costPrice : p.price * 0.6;
+    return acc + (cost * p.stock);
+  }, 0);
+  const lowStockCount = products.filter(p => p.stock <= 5).length;
+  const deadStockCount = products.filter(p => !p.salesCount || p.salesCount === 0).length;
+
+  const filteredStockProducts = products.filter(p => {
+    if (stockFilter === "low") return p.stock <= 5;
+    if (stockFilter === "dead") return !p.salesCount || p.salesCount === 0;
+    return true;
+  });
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50/50 rounded-3xl border border-gray-150 overflow-hidden shadow-sm -mx-4 sm:-mx-6 -my-6">
@@ -639,171 +661,525 @@ export default function AdminPanel({
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 overflow-y-auto flex-1">
 
       {/* RENDER ANALYTICS */}
-      {activeTab === "analytics" && (
-        <div className="space-y-6">
-          {/* Today's Live Updates Card */}
-          <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-[#3730a3] rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_120%,rgba(255,255,255,0.15),transparent)] pointer-events-none"></div>
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-1">
-                <span className="bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-white/10 inline-block animate-pulse">
-                  🔴 {lang === "bn" ? "আজকের রিয়েল-টাইম লাইভ আপডেট" : "TODAY'S REAL-TIME ACTIVITY"}
-                </span>
-                <h3 className="text-2xl font-black tracking-tight mt-1">
-                  {lang === "bn" ? "আজকে কতগুলো অফার বা অর্ডার আসলো?" : "How many offers or orders came today?"}
+      {activeTab === "analytics" && (() => {
+        // Advanced calculation block inside localized IIFE/closure
+        const totalOrdersCount = orders.length;
+        const deliveredCount = orders.filter(o => o.status === OrderStatus.DELIVERED).length;
+        const processingCount = orders.filter(o => o.status === OrderStatus.PROCESSING || o.status === OrderStatus.RECEIVED).length;
+        const cancelledCount = orders.filter(o => o.status === OrderStatus.CANCELLED).length;
+        const shippedCount = orders.filter(o => o.status === OrderStatus.SHIPPED || o.status === OrderStatus.OUT_FOR_DELIVERY).length;
+
+        const onlineRevenue = orders
+          .filter(o => o.status !== OrderStatus.CANCELLED && o.paymentMethod === "online")
+          .reduce((sum, o) => sum + o.totalAmount, 0);
+        const codRevenue = orders
+          .filter(o => o.status !== OrderStatus.CANCELLED && o.paymentMethod === "cod")
+          .reduce((sum, o) => sum + o.totalAmount, 0);
+
+        const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        const netProfit = totalRevenue - totalExpenses;
+        const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0;
+
+        const lowStockProducts = products.filter(p => p.stock <= 5);
+        const lowStockCount = lowStockProducts.length;
+
+        const adSpend = expenses
+          .filter(e => e.category.toLowerCase().includes("marketing") || e.description.toLowerCase().includes("ads") || e.description.toLowerCase().includes("facebook"))
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        const adRoi = adSpend > 0 ? (totalRevenue / adSpend).toFixed(1) : "0.0";
+
+        // Chart dynamic scaling calculations
+        const chartMax = Math.max(65000, totalRevenue, totalExpenses);
+        const getBarHeight = (val: number) => {
+          return Math.max(6, (val / chartMax) * 160); // Max bar height 160px inside SVG
+        };
+
+        return (
+          <div className="space-y-6">
+            {/* Today's Live Updates Card */}
+            <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-purple-950 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-indigo-900/40">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_120%,rgba(139,92,246,0.15),transparent)] pointer-events-none"></div>
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                    <span className="bg-white/10 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-white/5 inline-block">
+                      {lang === "bn" ? "রিয়েল-টাইম লাইভ ড্যাশবোর্ড" : "REAL-TIME LIVE MONITORING"}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-black tracking-tight mt-1">
+                    {lang === "bn" ? "অ্যাডভান্সড সেলস এবং প্রফিট অ্যানালিটিক্স" : "Advanced Sales & Profit Analytics"}
+                  </h3>
+                  <p className="text-indigo-200 text-xs">
+                    {lang === "bn" 
+                      ? "আপনার স্টোরের রিয়েল-টাইম কার্যক্রম, লাভজনকতা এবং স্টক স্তরের বিবরণ।" 
+                      : "View live business health, actual cost margins, and catalog stock warnings in one tab."}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 shrink-0 min-w-[280px] sm:min-w-[400px]">
+                  <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                    <span className="text-[10px] text-indigo-300 font-extrabold uppercase block tracking-wider">
+                      {lang === "bn" ? "আজকের মোট অর্ডার" : "Today's Orders"}
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-2xl font-black">{todayOrdersCount}</span>
+                      <span className="text-xs font-bold text-indigo-200">{lang === "bn" ? "টি" : "orders"}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                    <span className="text-[10px] text-indigo-300 font-extrabold uppercase block tracking-wider">
+                      {lang === "bn" ? "আজকের বিক্রি" : "Today's Revenue"}
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-2xl font-black">৳{todayRevenue}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-indigo-300 font-extrabold uppercase block tracking-wider">
+                      {lang === "bn" ? "চলমান ডেলিভারি" : "Today's Active"}
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-2xl font-black">{todayActiveOrdersCount}</span>
+                      <span className="text-xs font-bold text-indigo-200">{lang === "bn" ? "টি" : "items"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Summary Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              
+              {/* Card 1: Real-time Revenue */}
+              <div id="stat-card-revenue" className="bg-white border border-gray-100 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      {lang === "bn" ? "রিয়েল-টাইম রাজস্ব" : "Real-time Revenue"}
+                    </span>
+                    <h4 className="text-2xl font-black text-gray-900 tracking-tight">৳{totalRevenue}</h4>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-[#3730a3] flex items-center justify-center shrink-0">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[11px]">
+                  <span className="text-emerald-600 font-black flex items-center gap-0.5">
+                    <TrendingUp className="w-3.5 h-3.5" /> +15.8%
+                  </span>
+                  <span className="text-gray-400 font-semibold truncate">
+                    COD: ৳{codRevenue} | OP: ৳{onlineRevenue}
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 2: Total Orders */}
+              <div id="stat-card-orders" className="bg-white border border-gray-100 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      {lang === "bn" ? "মোট অর্ডার" : "Total Orders"}
+                    </span>
+                    <h4 className="text-2xl font-black text-gray-900 tracking-tight">{totalOrdersCount}</h4>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="w-5 h-5" />
+                  </div>
+                </div>
+                
+                {/* Orders mini progress distribution bar */}
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex justify-between text-[9px] font-black text-gray-400">
+                    <span>DLV: {deliveredCount}</span>
+                    <span>PRC: {processingCount}</span>
+                    <span>CAN: {cancelledCount}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-1.5 rounded-full flex overflow-hidden">
+                    <div 
+                      title={`Delivered: ${deliveredCount}`}
+                      className="bg-emerald-500 h-full transition-all" 
+                      style={{ width: `${totalOrdersCount > 0 ? (deliveredCount / totalOrdersCount) * 100 : 0}%` }}
+                    />
+                    <div 
+                      title={`Processing/Received: ${processingCount}`}
+                      className="bg-indigo-500 h-full transition-all" 
+                      style={{ width: `${totalOrdersCount > 0 ? (processingCount / totalOrdersCount) * 100 : 0}%` }}
+                    />
+                    <div 
+                      title={`Shipped: ${shippedCount}`}
+                      className="bg-amber-500 h-full transition-all" 
+                      style={{ width: `${totalOrdersCount > 0 ? (shippedCount / totalOrdersCount) * 100 : 0}%` }}
+                    />
+                    <div 
+                      title={`Cancelled: ${cancelledCount}`}
+                      className="bg-rose-500 h-full transition-all" 
+                      style={{ width: `${totalOrdersCount > 0 ? (cancelledCount / totalOrdersCount) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Net Profit */}
+              <div id="stat-card-profit" className="bg-white border border-gray-100 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      {lang === "bn" ? "নিট লাভ" : "Net Profit"}
+                    </span>
+                    <h4 className={`text-2xl font-black tracking-tight ${netProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                      ৳{netProfit}
+                    </h4>
+                  </div>
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${netProfit >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+                    <Percent className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[11px]">
+                  <span className={`font-black flex items-center gap-0.5 ${netProfit >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                    {netProfit >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                    {profitMargin}% margin
+                  </span>
+                  <span className="text-gray-400 font-semibold text-right">
+                    Exp: ৳{totalExpenses}
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 4: Low Stock Alerts */}
+              <div id="stat-card-stock" className="bg-white border border-gray-100 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      {lang === "bn" ? "লো স্টক অ্যালার্ট" : "Low Stock Alerts"}
+                    </span>
+                    <h4 className={`text-2xl font-black tracking-tight ${lowStockCount > 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                      {lowStockCount} {lang === "bn" ? "টি পণ্য" : "items"}
+                    </h4>
+                  </div>
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${lowStockCount > 0 ? "bg-rose-50 text-rose-500 animate-bounce" : "bg-emerald-50 text-emerald-600"}`}>
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                </div>
+                
+                {/* Scrollable list or simple stock state label */}
+                <div className="mt-3 text-[10px] text-gray-500 font-bold max-h-[32px] overflow-y-auto space-y-0.5">
+                  {lowStockCount > 0 ? (
+                    lowStockProducts.slice(0, 2).map(p => (
+                      <div key={p.id} className="flex justify-between text-rose-600 bg-rose-50/40 px-1.5 py-0.5 rounded border border-rose-100/30">
+                        <span className="truncate max-w-[110px]">{lang === "bn" ? p.banglaName || p.name : p.name}</span>
+                        <span className="shrink-0 font-black">{p.stock} left</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-emerald-700 flex items-center gap-1">
+                      <span>✓</span> {lang === "bn" ? "সকল পণ্যের পর্যাপ্ত স্টক আছে" : "All catalog items healthy"}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Visual Charts Comparison & Monthly Insights */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              
+              {/* Left Column: Visual Chart (Col Span 2) */}
+              <div className="xl:col-span-2 bg-white rounded-3xl border border-gray-100 p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-4 border-b border-gray-100">
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm tracking-wide uppercase flex items-center gap-1.5">
+                        <span>📊</span> {lang === "bn" ? "মাসিক আয় বনাম ব্যয় বিবরণী" : "Revenue vs Expenses Breakdown"}
+                      </h3>
+                      <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
+                        {lang === "bn" ? "বিগত ৩ মাসের আয়, বিজ্ঞাপন ব্যয় এবং নিট লাভের তুলনা" : "Compare earnings, ads outlay, and clear margins over the past 3 months"}
+                      </p>
+                    </div>
+                    
+                    {/* Interactive Legend */}
+                    <div className="flex items-center gap-3 text-[10px] font-black uppercase shrink-0">
+                      <div className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-indigo-600 block"></span>
+                        <span className="text-gray-600">{lang === "bn" ? "আয়" : "Revenue"}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 block"></span>
+                        <span className="text-gray-600">{lang === "bn" ? "ব্যয়" : "Expenses"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CUSTOM SVG DYNAMIC COLUMN CHART */}
+                  <div className="w-full h-56 relative bg-gray-50/30 border border-gray-100 rounded-2xl p-4 flex flex-col justify-between">
+                    
+                    {/* Chart Core Area */}
+                    <div className="flex-1 w-full relative flex items-end justify-around px-2 sm:px-6">
+                      
+                      {/* Grid background lines */}
+                      <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[8px] font-bold text-gray-300">
+                        <div className="border-b border-gray-100/80 w-full pt-1 pr-2 text-right">৳{chartMax}</div>
+                        <div className="border-b border-gray-100/80 w-full pt-1 pr-2 text-right">৳{Math.round(chartMax * 0.66)}</div>
+                        <div className="border-b border-gray-100/80 w-full pt-1 pr-2 text-right">৳{Math.round(chartMax * 0.33)}</div>
+                        <div className="border-b border-gray-100 w-full pt-1 pr-2 text-right">৳0</div>
+                      </div>
+
+                      {/* Bar 1: May */}
+                      <div className="flex flex-col items-center gap-1.5 z-10 group relative">
+                        <div className="flex items-end gap-1.5 sm:gap-3">
+                          {/* Revenue */}
+                          <div 
+                            className="w-4 sm:w-8 bg-indigo-600 hover:bg-indigo-700 rounded-t-sm sm:rounded-t-md transition-all duration-500 shadow-xs relative cursor-pointer"
+                            style={{ height: `${getBarHeight(35000)}px` }}
+                          >
+                            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap transition-opacity pointer-events-none z-20">
+                              Rev: ৳35,000
+                            </div>
+                          </div>
+                          {/* Expenses */}
+                          <div 
+                            className="w-4 sm:w-8 bg-rose-500 hover:bg-rose-600 rounded-t-sm sm:rounded-t-md transition-all duration-500 shadow-xs relative cursor-pointer"
+                            style={{ height: `${getBarHeight(10500)}px` }}
+                          >
+                            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap transition-opacity pointer-events-none z-20">
+                              Exp: ৳10,500
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-extrabold tracking-wider">{lang === "bn" ? "মে" : "May 2026"}</span>
+                      </div>
+
+                      {/* Bar 2: June */}
+                      <div className="flex flex-col items-center gap-1.5 z-10 group relative">
+                        <div className="flex items-end gap-1.5 sm:gap-3">
+                          {/* Revenue */}
+                          <div 
+                            className="w-4 sm:w-8 bg-indigo-600 hover:bg-indigo-700 rounded-t-sm sm:rounded-t-md transition-all duration-500 shadow-xs relative cursor-pointer"
+                            style={{ height: `${getBarHeight(48500)}px` }}
+                          >
+                            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap transition-opacity pointer-events-none z-20">
+                              Rev: ৳48,500
+                            </div>
+                          </div>
+                          {/* Expenses */}
+                          <div 
+                            className="w-4 sm:w-8 bg-rose-500 hover:bg-rose-600 rounded-t-sm sm:rounded-t-md transition-all duration-500 shadow-xs relative cursor-pointer"
+                            style={{ height: `${getBarHeight(14200)}px` }}
+                          >
+                            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap transition-opacity pointer-events-none z-20">
+                              Exp: ৳14,200
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-extrabold tracking-wider">{lang === "bn" ? "জুন" : "June 2026"}</span>
+                      </div>
+
+                      {/* Bar 3: July (Real-time!) */}
+                      <div className="flex flex-col items-center gap-1.5 z-10 group relative">
+                        <div className="flex items-end gap-1.5 sm:gap-3">
+                          {/* Revenue (Dynamic) */}
+                          <div 
+                            className="w-4 sm:w-8 bg-indigo-600 hover:bg-indigo-700 rounded-t-sm sm:rounded-t-md transition-all duration-500 shadow-xs relative cursor-pointer ring-2 ring-indigo-300 ring-offset-2"
+                            style={{ height: `${getBarHeight(totalRevenue)}px` }}
+                          >
+                            <div className="opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-indigo-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs whitespace-nowrap z-20">
+                              Rev: ৳{totalRevenue}
+                            </div>
+                          </div>
+                          {/* Expenses (Dynamic) */}
+                          <div 
+                            className="w-4 sm:w-8 bg-rose-500 hover:bg-rose-600 rounded-t-sm sm:rounded-t-md transition-all duration-500 shadow-xs relative cursor-pointer ring-2 ring-rose-200 ring-offset-2"
+                            style={{ height: `${getBarHeight(totalExpenses)}px` }}
+                          >
+                            <div className="opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-rose-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs whitespace-nowrap z-20">
+                              Exp: ৳{totalExpenses}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-indigo-900 font-black tracking-wider flex items-center gap-1">
+                          {lang === "bn" ? "জুলাই (চলতি)" : "July (Live)"} <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping"></span>
+                        </span>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-gray-400 font-bold bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex items-center gap-2 mt-4 shrink-0">
+                  <span className="text-indigo-600 text-sm">💡</span>
+                  <p className="leading-relaxed">
+                    {lang === "bn" 
+                      ? "জুলাই মাসের আয় ও ব্যয় ডাটা কাস্টমারদের অর্ডার প্লেস করার সাথে সাথে স্বয়ংক্রিয়ভাবে রিয়েল-টাইমে আপডেট হচ্ছে।" 
+                      : "July's bar grows dynamically as your storefront processes incoming orders and you log expenses in real-time."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Column: Monthly Insights (Col Span 1) */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-xs flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm tracking-wide uppercase flex items-center gap-1.5 pb-3 border-b border-gray-100 mb-3">
+                    <Sparkles className="w-4 h-4 text-[#3730a3]" />
+                    <span>{lang === "bn" ? "অ্যাডভান্সড মাসিক ইনসাইটস" : "Monthly Business Insights"}</span>
+                  </h3>
+
+                  {/* Insight list */}
+                  <div className="space-y-3">
+                    
+                    {/* Insight 1: Financial Margin Advice */}
+                    <div className="bg-indigo-50/30 border border-indigo-100/40 p-3 rounded-2xl space-y-1">
+                      <p className="text-[10px] font-black text-[#3730a3] uppercase tracking-wider flex items-center justify-between">
+                        <span>📈 {lang === "bn" ? "লাভজনকতা সূচক" : "Profitability Rating"}</span>
+                        <span className="bg-emerald-50 text-emerald-800 text-[8px] px-1.5 py-0.5 rounded">
+                          {profitMargin >= 40 ? "Excellent" : profitMargin >= 20 ? "Healthy" : "Check Spend"}
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-700 font-medium leading-relaxed mt-1">
+                        {profitMargin >= 50 ? (
+                          lang === "bn"
+                            ? "চমৎকার! আপনার নিট মুনাফার হার অত্যন্ত সন্তোষজনক। কস্ট অফ গুডস এবং ডেলিভারি চার্জ সঠিকভাবে অপ্টিমাইজড।"
+                            : "Excellent! Your net margin is extremely high. Operations are streamlined and sourcing costs are perfectly balanced."
+                        ) : profitMargin >= 20 ? (
+                          lang === "bn"
+                            ? "ভালো! আপনার ব্যবসা লাভজনক অবস্থায় আছে। কাস্টমারদের আকর্ষণ করতে মেটা বিজ্ঞাপনের বাজেট বৃদ্ধি করতে পারেন।"
+                            : "Good performance! Your store is safely profitable. Consider boosting Meta ad budgets to acquire more traffic."
+                        ) : (
+                          lang === "bn"
+                            ? "সতর্কতা: আয়ের তুলনায় ব্যয় কিছুটা বেশি। প্রফিট বাড়াতে অ্যাড স্পেন্ড কমানোর বা ডেলিভারি চার্জ পুনর্নির্ধারণের পরামর্শ।"
+                            : "Notice: Overhead expenses are high compared to current sales. Audit marketing budgets to preserve cash flow."
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Insight 2: Advertising ROAS Tracker */}
+                    <div className="bg-purple-50/30 border border-purple-100/40 p-3 rounded-2xl space-y-1">
+                      <p className="text-[10px] font-black text-purple-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>📢 {lang === "bn" ? "মেটা অ্যাডস আরওএএস (ROAS)" : "Estimated Meta Ads ROAS"}</span>
+                        <span className="bg-purple-100 text-purple-800 text-[8px] px-1.5 py-0.5 rounded">{adRoi}x ROI</span>
+                      </p>
+                      <p className="text-xs text-gray-700 font-medium leading-relaxed mt-1">
+                        {lang === "bn"
+                          ? `মেটা অ্যাড ফেসবুক ক্যাম্পেইনের খরচ বিবেচনা করে আপনার আনুমানিক রিটার্ন অন অ্যাড স্পেন্ড (ROAS) হচ্ছে ${adRoi}x। খরচ: ৳${adSpend}।`
+                          : `Your estimated Meta ads Return on Ad Spend (ROAS) is ${adRoi}x, with total dynamic campaign budget logged as ৳${adSpend}.`}
+                      </p>
+                    </div>
+
+                    {/* Insight 3: Low Stock Action Reminder */}
+                    <div className={`p-3 rounded-2xl border ${
+                      lowStockCount > 0 
+                        ? "bg-rose-50/30 border-rose-100 text-rose-950" 
+                        : "bg-emerald-50/30 border-emerald-100 text-emerald-950"
+                    }`}>
+                      <p className="text-[10px] font-black uppercase tracking-wider flex items-center justify-between">
+                        <span>📦 {lang === "bn" ? "স্টক রিস্টক সতর্কতা" : "Inventory Restock Alert"}</span>
+                        {lowStockCount > 0 && <span className="bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded animate-pulse">Urgent</span>}
+                      </p>
+                      <p className="text-xs font-semibold leading-relaxed mt-1">
+                        {lowStockCount > 0 ? (
+                          lang === "bn"
+                            ? `${lowStockCount}টি প্রোডাক্টের স্টক ফুরিয়ে যাচ্ছে! ডেলিভারি মিস হওয়া রুখতে দ্রুত স্টক আপডেট করুন।`
+                            : `${lowStockCount} items are running low! Instantly increment quantities in the Stock tab to prevent lost orders.`
+                        ) : (
+                          lang === "bn"
+                            ? "দারুণ! আপনার স্টোরের কোনো পণ্যের স্টকই এই মুহূর্তে ফুরিয়ে যাওয়ার ঝুঁকিতে নেই।"
+                            : "Perfect! Every single catalog product is safely stocked. Your storefront is secure from stock-outs."
+                        )}
+                      </p>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Switch to stock tab button */}
+                <button
+                  onClick={() => setActiveTab("stock")}
+                  className="w-full bg-[#3730a3] hover:bg-[#4338ca] text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer shadow-sm text-center transition-all flex items-center justify-center gap-1"
+                >
+                  ⚙️ {lang === "bn" ? "স্টক লেভেল আপডেট করুন" : "Manage Product Stock"} <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+            </div>
+
+            {/* Quick Orders Stream Table */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-xs">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                <h3 className="font-bold text-gray-900 text-sm tracking-wide uppercase flex items-center gap-1.5">
+                  <span>🚀</span> {lang === "bn" ? "সাম্প্রতিক কাস্টমার অর্ডার স্ট্রীম" : "Live Storefront Order Stream"}
                 </h3>
-                <p className="text-emerald-100 text-xs">
-                  {lang === "bn" 
-                    ? "আজকের দিনের সকল কাস্টমার ক্রিয়াকলাপ এবং কনভার্সন এক নজরে দেখুন।" 
-                    : "Track all incoming customer actions and conversions logged today in real-time."}
-                </p>
+                <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-100/50">
+                  {orders.length} {lang === "bn" ? "টি মোট অর্ডার" : "total orders logged"}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 shrink-0 min-w-[280px] sm:min-w-[400px]">
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
-                  <span className="text-[10px] text-emerald-200 font-extrabold uppercase block tracking-wider">
-                    {lang === "bn" ? "আজকের মোট অর্ডার" : "Today's Orders"}
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-black">{todayOrdersCount}</span>
-                    <span className="text-xs font-bold text-emerald-200">{lang === "bn" ? "টি" : "orders"}</span>
-                  </div>
+              {orders.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 text-sm font-semibold space-y-2">
+                  <span className="text-3xl block">🛒</span>
+                  <p>{lang === "bn" ? "এখনও কোনো অর্ডার আসেনি।" : "No logged sales activities yet."}</p>
                 </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
-                  <span className="text-[10px] text-emerald-200 font-extrabold uppercase block tracking-wider">
-                    {lang === "bn" ? "আজকের মোট বিক্রি" : "Today's Revenue"}
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-black">৳{todayRevenue}</span>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 col-span-2 sm:col-span-1">
-                  <span className="text-[10px] text-emerald-200 font-extrabold uppercase block tracking-wider">
-                    {lang === "bn" ? "চলমান ডেলিভারি" : "Today's Active"}
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-black">{todayActiveOrdersCount}</span>
-                    <span className="text-xs font-bold text-emerald-200">{lang === "bn" ? "টি" : "items"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Business Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === "bn" ? "মোট বিক্রি" : "Total Revenue"}</span>
-                <h4 className="text-indigo-900lue-600xl font-black text-gray-900 mt-1">৳{totalRevenue}</h4>
-                <p className="text-[10px] text-[#3730a3] font-bold flex items-center gap-0.5 mt-1">
-                  <TrendingUp className="w-3.5 h-3.5" /> +12.5% {lang === "bn" ? "বৃদ্ধি" : "increase"}
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#3730a3] flex items-center justify-center">
-                <DollarSign className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === "bn" ? "মোট অর্ডার" : "Total Orders"}</span>
-                <h4 className="text-indigo-900lue-600xl font-black text-gray-900 mt-1">{orders.length}</h4>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  {lang === "bn" ? `ডিজিটাল ট্র্যাকিং সক্রিয়` : "Real-time logged"}
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <ShoppingBag className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === "bn" ? "চলমান ডেলিভারি" : "Active Delivery"}</span>
-                <h4 className="text-indigo-900lue-600xl font-black text-gray-900 mt-1">{activeOrdersCount}</h4>
-                <p className="text-[10px] text-blue-800mber-600 font-semibold mt-1">
-                  {lang === "bn" ? "কুরিয়ার ট্রানজিটে আছে" : "In-route with courier"}
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-blue-800mber-600 flex items-center justify-center">
-                <Package className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === "bn" ? "গড় অর্ডারের মূল্য" : "Avg Order Value"}</span>
-                <h4 className="text-indigo-900lue-600xl font-black text-gray-900 mt-1">৳{averageOrderValue}</h4>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  {lang === "bn" ? "প্রতি কাস্টমার লেনদেন" : "Per-shopper basket size"}
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Orders Stream Table */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-            <h3 className="text-indigo-900lue-600ase font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span>🚀</span> {lang === "bn" ? "সাম্প্রতিক বিক্রয় কার্যক্রম" : "Live Storefront Order Stream"}
-            </h3>
-
-            {orders.length === 0 ? (
-              <div className="text-indigo-900enter py-8 text-gray-400 text-sm">
-                {lang === "bn" ? "এখনও কোনো অর্ডার আসেনি।" : "No logged sales activities yet."}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead>
-                    <tr className="border-indigo-800 border-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                      <th className="pb-3">{lang === "bn" ? "আইডি" : "Order ID"}</th>
-                      <th className="pb-3">{lang === "bn" ? "গ্রাহক" : "Customer"}</th>
-                      <th className="pb-3">{lang === "bn" ? "মোট মূল্য" : "Amount"}</th>
-                      <th className="pb-3">{lang === "bn" ? "বর্তমান অবস্থা" : "Status"}</th>
-                      <th className="pb-3">{lang === "bn" ? "প্রচার মাধ্যম" : "Referrer"}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 text-gray-700">
-                    {orders.slice(0, 5).map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50/50">
-                        <td className="py-3.5 font-mono text-xs font-bold text-[#3730a3]">{order.id}</td>
-                        <td className="py-3.5 font-medium">{order.customerName}</td>
-                        <td className="py-3.5 font-semibold">৳{order.totalAmount}</td>
-                        <td className="py-3.5">
-                          <span className={`inline-block px-2.5 py-1 text-[10px] font-bold rounded-full ${
-                            order.status === OrderStatus.DELIVERED
-                              ? "bg-indigo-50 text-red-700 border border-indigo-800lue-100"
-                              : order.status === OrderStatus.CANCELLED
-                              ? "bg-indigo-50 text-red-700 border border-indigo-800lue-100"
-                              : "bg-amber-50 text-blue-800mber-700 border border-amber-100"
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 text-xs text-gray-400 font-semibold">
-                          {order.fbCampaignRef ? (
-                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md font-mono">
-                              📢 Facebook Ads
-                            </span>
-                          ) : (
-                            "Direct Shop"
-                          )}
-                        </td>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        <th className="pb-3">{lang === "bn" ? "আইডি" : "Order ID"}</th>
+                        <th className="pb-3">{lang === "bn" ? "গ্রাহক" : "Customer"}</th>
+                        <th className="pb-3">{lang === "bn" ? "মোট মূল্য" : "Amount"}</th>
+                        <th className="pb-3">{lang === "bn" ? "পদ্ধতি" : "Method"}</th>
+                        <th className="pb-3">{lang === "bn" ? "বর্তমান অবস্থা" : "Status"}</th>
+                        <th className="pb-3">{lang === "bn" ? "প্রচার মাধ্যম" : "Referrer"}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-gray-700">
+                      {orders.slice(0, 8).map((order) => (
+                        <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-3 font-mono text-xs font-bold text-[#3730a3]">{order.id}</td>
+                          <td className="py-3">
+                            <p className="font-bold text-gray-800 text-xs">{order.customerName}</p>
+                            <p className="text-[10px] text-gray-400 font-semibold">{order.customerPhone}</p>
+                          </td>
+                          <td className="py-3 font-semibold text-gray-900 text-xs">৳{order.totalAmount}</td>
+                          <td className="py-3 uppercase text-[10px] font-black">
+                            {order.paymentMethod === "online" ? (
+                              <span className="text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                                {order.onlineGatewayType || "mobile"}
+                              </span>
+                            ) : (
+                              <span className="text-gray-600 bg-gray-100 px-2 py-0.5 rounded">COD</span>
+                            )}
+                          </td>
+                          <td className="py-3">
+                            <span className={`inline-block px-2 py-0.5 text-[9px] font-black rounded ${
+                              order.status === OrderStatus.DELIVERED
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : order.status === OrderStatus.CANCELLED
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}>
+                              {order.status}
+                            </span>
+                          </td>
+                          <td className="py-3 text-[10px] text-gray-400 font-bold">
+                            {order.fbCampaignRef ? (
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded font-mono">
+                                📢 Facebook Ads
+                              </span>
+                            ) : (
+                              "Direct Shop"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* RENDER ORDERS MANAGER */}
       {activeTab === "orders" && (() => {
@@ -1241,6 +1617,18 @@ export default function AdminPanel({
                 </div>
 
                 <div className="space-y-1.5">
+                  <label className="text-gray-500 font-bold">Cost Price / Sourcing Cost (BDT - Optional)</label>
+                  <input
+                    id="form-product-cost-price"
+                    type="number"
+                    value={editingProduct?.costPrice || ""}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, costPrice: Number(e.target.value) || undefined })}
+                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="e.g. 500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
                   <label className="text-gray-500 font-bold">Stock Quantity *</label>
                   <input
                     id="form-product-stock"
@@ -1513,6 +1901,126 @@ export default function AdminPanel({
                       ? "প্রোডাক্টটি যদি অন্য কোনো শপ থেকে নেয়া হয়ে থাকে তবে এখানে তাদের নাম লিখুন। এতে সহজেই তাদের ডেলিভারি শিট ডাউনলোড করতে পারবেন।" 
                       : "If this product is sourced from another shop, specify their name. You will be able to filter and export their order spreadsheets."}
                   </p>
+                </div>
+
+                {/* Product Variations Block (Unlimited) */}
+                <div className="space-y-3 md:col-span-2 bg-slate-50 border border-gray-200 p-4 rounded-2xl">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+                    <h5 className="font-extrabold text-xs text-gray-800 flex items-center gap-1.5">
+                      <span>🏷️</span>
+                      {lang === "bn" ? "প্রোডাক্ট ভ্যারিয়েশন (অসীম)" : "Product Variations (Unlimited)"}
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentVars = editingProduct?.variations || [];
+                        setEditingProduct({
+                          ...editingProduct,
+                          variations: [...currentVars, { name: "", options: [] }]
+                        });
+                      }}
+                      className="text-xs bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] font-bold px-3 py-1.5 rounded-lg border border-indigo-100 transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>➕</span> {lang === "bn" ? "ভ্যারিয়েশন যোগ করুন" : "Add Variation"}
+                    </button>
+                  </div>
+
+                  {(editingProduct?.variations || []).length === 0 ? (
+                    <p className="text-[11px] text-gray-400 py-2">
+                      {lang === "bn" ? "কোনো কাস্টম ভ্যারিয়েশন যোগ করা হয়নি। আপনি সাইজ বা কালার ছাড়াও যেকোনো ধরণের ভ্যারিয়েন্ট যোগ করতে পারেন।" : "No custom variations added yet. You can add attributes like Size, Color, Weight, Storage, etc."}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(editingProduct?.variations || []).map((v, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-gray-150">
+                          <div className="w-full sm:w-1/3 space-y-1">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ভ্যারিয়েশন টাইপ" : "Attribute Name"}</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Size, Color, Storage"
+                              value={v.name}
+                              onChange={(e) => {
+                                const currentVars = [...(editingProduct?.variations || [])];
+                                currentVars[idx].name = e.target.value;
+                                setEditingProduct({ ...editingProduct, variations: currentVars });
+                              }}
+                              className="w-full bg-slate-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+                            />
+                          </div>
+                          <div className="w-full sm:w-2/3 space-y-1">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "অপশন সমূহ (কমা দিয়ে আলাদা করুন)" : "Options (comma separated)"}</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Red, Blue, Green OR S, M, L, XL"
+                              value={v.options.join(", ")}
+                              onChange={(e) => {
+                                const currentVars = [...(editingProduct?.variations || [])];
+                                currentVars[idx].options = e.target.value.split(",").map(item => item.trim()).filter(Boolean);
+                                setEditingProduct({ ...editingProduct, variations: currentVars });
+                              }}
+                              className="w-full bg-slate-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentVars = (editingProduct?.variations || []).filter((_, i) => i !== idx);
+                              setEditingProduct({ ...editingProduct, variations: currentVars });
+                            }}
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-100 self-end sm:self-center transition-all cursor-pointer mt-2 sm:mt-4"
+                            title="Remove Variation"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* SEO Meta Tags Block */}
+                <div className="space-y-3.5 md:col-span-2 bg-slate-50 border border-gray-200 p-4 rounded-2xl">
+                  <h5 className="font-extrabold text-xs text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-1.5">
+                    <span>🔍</span>
+                    {lang === "bn" ? "এসইও ও সার্চ ইঞ্জিন অপটিমাইজেশন (SEO Meta Tags)" : "Search Engine Optimization (SEO Meta Tags)"}
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-gray-500 font-bold">{lang === "bn" ? "এসইও মেটা টাইটেল (SEO Title)" : "SEO Meta Title"}</label>
+                      <input
+                        type="text"
+                        value={editingProduct?.seoTitle || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, seoTitle: e.target.value })}
+                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder={lang === "bn" ? "সার্চ ইঞ্জিনে দেখানোর জন্য টাইটেল" : "e.g. Buy Premium T-Shirt Online | Johurul BDShop"}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-gray-500 font-bold">{lang === "bn" ? "এসইও মেটা ডেসক্রিপশন (SEO Description)" : "SEO Meta Description"}</label>
+                      <textarea
+                        rows={2}
+                        value={editingProduct?.seoDescription || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, seoDescription: e.target.value })}
+                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-semibold"
+                        placeholder={lang === "bn" ? "সার্চ ইঞ্জিনে দেখানোর জন্য ছোট বিবরণ" : "e.g. Discover premium cotton t-shirts in Bangladesh. Free shipping inside Dhaka, fast delivery. Buy now at Johurul BDShop."}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-gray-500 font-bold">{lang === "bn" ? "এসইও কিওয়ার্ডস (SEO Keywords)" : "SEO Keywords (comma separated)"}</label>
+                      <input
+                        type="text"
+                        value={editingProduct?.seoKeywords || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, seoKeywords: e.target.value })}
+                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g. t-shirt online, bangla t-shirt store, cotton t-shirt dhaka"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2954,100 +3462,267 @@ export default function AdminPanel({
       {/* RENDER STOCK */}
       {activeTab === "stock" && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
-            <div className="pb-4 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <div>
-                <h3 className="text-lg font-black text-gray-900">{lang === "bn" ? "ইনভেন্টরি ও স্টক লেভেল" : "Warehouse Stock & Logistics"}</h3>
-                <p className="text-xs text-gray-400 font-semibold">{lang === "bn" ? "আপনার সকল পণ্যের এভেইলেবল স্টক লেভেল পরিবর্তন করুন এবং স্টক বাড়ান এক ক্লিকে।" : "Real-time stock monitoring, logs, and rapid quantity increment controls."}</p>
+          {/* Inventory Control Panel Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Valuation Card */}
+            <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden">
+              <div className="absolute right-4 top-4 text-emerald-100 bg-emerald-50 p-2 rounded-2xl">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+              </div>
+              <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">
+                {lang === "bn" ? "ইনভেন্টরি মোট মূল্যমান" : "Inventory Valuation"}
+              </span>
+              <div className="space-y-1">
+                <h4 className="text-xl font-black text-gray-900 font-mono">
+                  ৳{totalRetailValuation.toLocaleString()}
+                </h4>
+                <p className="text-[10px] text-gray-500 font-bold flex justify-between">
+                  <span>{lang === "bn" ? "ক্রয় মূল্য:" : "Cost value:"}</span>
+                  <span className="font-mono">৳{totalCostValuation.toLocaleString()}</span>
+                </p>
+                <p className="text-[10px] text-emerald-600 font-bold flex justify-between border-t border-dashed border-gray-100 pt-1">
+                  <span>{lang === "bn" ? "সম্ভাব্য লাভ:" : "Potential Profit:"}</span>
+                  <span className="font-mono">৳{(totalRetailValuation - totalCostValuation).toLocaleString()}</span>
+                </p>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse font-sans">
-                <thead>
-                  <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
-                    <th className="pb-3">{lang === "bn" ? "প্রোডাক্ট বিবরণ" : "Product Details"}</th>
-                    <th className="pb-3">{lang === "bn" ? "ক্যাটাগরি" : "Category"}</th>
-                    <th className="pb-3">{lang === "bn" ? "স্টক বার" : "Inventory Level Bar"}</th>
-                    <th className="pb-3">{lang === "bn" ? "স্টক স্ট্যাটাস" : "Supply Status"}</th>
-                    <th className="pb-3 text-right">{lang === "bn" ? "স্টক পরিবর্তন" : "Quick Adjust Stock"}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
-                  {products.map((p) => {
-                    const stockPercent = Math.min((p.stock / 100) * 100, 100);
-                    return (
-                      <tr key={p.id}>
-                        <td className="py-3.5 flex items-center gap-3">
-                          <img
-                            src={p.image}
-                            alt={p.name}
-                            className="w-10 h-10 rounded-lg object-cover border shrink-0"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div>
-                            <h4 className="font-bold text-gray-900">{lang === "bn" ? p.banglaName || p.name : p.name}</h4>
-                            <span className="text-[10px] font-mono text-gray-400">ID: {p.id}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5">
-                          <span className="bg-indigo-50 text-[#3730a3] px-2 py-0.5 rounded text-[10px] font-bold">{p.category}</span>
-                        </td>
-                        <td className="py-3.5 w-48">
-                          <div className="space-y-1 font-mono">
-                            <span className="text-[10px] font-bold text-gray-600">{p.stock} pcs remaining</span>
-                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  p.stock <= 5 ? "bg-red-500" : p.stock <= 15 ? "bg-amber-500" : "bg-emerald-500"
-                                }`}
-                                style={{ width: `${stockPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
-                            p.stock <= 0 
-                              ? "bg-red-50 text-red-700 border border-red-100" 
-                              : p.stock <= 5 
-                              ? "bg-amber-50 text-amber-700 border border-amber-100" 
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                          }`}>
-                            {p.stock <= 0 ? "OUT OF STOCK" : p.stock <= 5 ? "LOW STOCK" : "HEALTHY"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 text-right">
-                          <div className="flex justify-end items-center gap-1.5">
-                            <input
-                              id={`stock-input-${p.id}`}
-                              type="number"
-                              defaultValue={p.stock}
-                              className="w-16 bg-slate-50 border border-gray-250 rounded-lg px-2 py-1 text-center font-mono text-xs font-bold"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const input = document.getElementById(`stock-input-${p.id}`) as HTMLInputElement;
-                                if (input) {
-                                  const newVal = Number(input.value);
-                                  const updated = products.map(prod => prod.id === p.id ? { ...prod, stock: newVal } : prod);
-                                  onUpdateProducts(updated);
-                                  alert(lang === "bn" ? "স্টক লেভেল সফলভাবে আপডেট হয়েছে!" : "Product stock level updated successfully!");
-                                }
-                              }}
-                              className="bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg cursor-pointer shadow-xs transition-all"
-                            >
-                              Update
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Total Stock Pieces Card */}
+            <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden">
+              <div className="absolute right-4 top-4 text-indigo-100 bg-indigo-50 p-2 rounded-2xl">
+                <Package className="w-5 h-5 text-[#3730a3]" />
+              </div>
+              <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">
+                {lang === "bn" ? "মোট মজুদ আইটেম" : "Total Stock Units"}
+              </span>
+              <div className="space-y-1">
+                <h4 className="text-xl font-black text-gray-900 font-mono">
+                  {totalStockItems.toLocaleString()} pcs
+                </h4>
+                <p className="text-[10px] text-gray-500 font-bold">
+                  {lang === "bn" ? `মোট ${products.length}টি স্বতন্ত্র ক্যাটাগরি আইটেম` : `Across ${products.length} catalog products`}
+                </p>
+              </div>
             </div>
+
+            {/* Low Stock Highlight Card */}
+            <button
+              type="button"
+              onClick={() => setStockFilter("low")}
+              className={`text-left w-full bg-white border rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden transition-all hover:scale-[1.01] ${
+                stockFilter === "low" ? "border-amber-500 ring-2 ring-amber-500/20" : "border-gray-100"
+              }`}
+            >
+              <div className="absolute right-4 top-4 text-amber-100 bg-amber-50 p-2 rounded-2xl">
+                <AlertCircle className="w-5 h-5 text-amber-600 animate-pulse" />
+              </div>
+              <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">
+                {lang === "bn" ? "কম স্টক অ্যালার্ট" : "Low Stock Alerts"}
+              </span>
+              <div className="space-y-1">
+                <h4 className="text-xl font-black text-amber-700 font-mono">
+                  {lowStockCount} {lang === "bn" ? "টি পণ্য" : "items"}
+                </h4>
+                <p className="text-[10px] text-gray-500 font-bold">
+                  {lang === "bn" ? "স্টক ৫ পিস বা তার নিচে নেমে গেছে" : "Stock quantity is 5 units or lower"}
+                </p>
+              </div>
+            </button>
+
+            {/* Dead Stock Card */}
+            <button
+              type="button"
+              onClick={() => setStockFilter("dead")}
+              className={`text-left w-full bg-white border rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden transition-all hover:scale-[1.01] ${
+                stockFilter === "dead" ? "border-red-500 ring-2 ring-red-500/20" : "border-gray-100"
+              }`}
+            >
+              <div className="absolute right-4 top-4 text-red-100 bg-red-50 p-2 rounded-2xl">
+                <TrendingDown className="w-5 h-5 text-red-600" />
+              </div>
+              <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">
+                {lang === "bn" ? "অচল স্টক (Dead Stock)" : "Dead Stock Items"}
+              </span>
+              <div className="space-y-1">
+                <h4 className="text-xl font-black text-red-700 font-mono">
+                  {deadStockCount} {lang === "bn" ? "টি পণ্য" : "items"}
+                </h4>
+                <p className="text-[10px] text-gray-500 font-bold">
+                  {lang === "bn" ? "এখনো পর্যন্ত একটিও সেল হয়নি" : "Products with zero logged sales count"}
+                </p>
+              </div>
+            </button>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
+            <div className="pb-4 border-b border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="text-base font-black text-gray-900 uppercase tracking-wider">
+                  {lang === "bn" ? "ইনভেন্টরি কন্ট্রোল ও স্টক লেভেল" : "Warehouse Stock & Logistics"}
+                </h3>
+                <p className="text-xs text-gray-400 font-semibold mt-0.5">
+                  {lang === "bn" ? "স্টক লেভেল দ্রুত আপডেট করুন এবং পণ্যের সোর্সিং ভ্যালু মনিটর করুন।" : "Update physical stock counts, view cost margins, and filter logistics."}
+                </p>
+              </div>
+
+              {/* Filtering segmented controls */}
+              <div className="flex bg-slate-50 border border-gray-150 p-1 rounded-xl gap-1 shrink-0 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setStockFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    stockFilter === "all" ? "bg-white text-[#3730a3] shadow-xs" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {lang === "bn" ? "সব পণ্য" : "All Products"} ({products.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockFilter("low")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    stockFilter === "low" ? "bg-amber-50 text-amber-700 shadow-xs" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {lang === "bn" ? "কম স্টক" : "Low Stock"} ({lowStockCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockFilter("dead")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    stockFilter === "dead" ? "bg-red-50 text-red-700 shadow-xs" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {lang === "bn" ? "অচল স্টক" : "Dead Stock"} ({deadStockCount})
+                </button>
+              </div>
+            </div>
+
+            {filteredStockProducts.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 font-bold text-xs space-y-2">
+                <Package className="w-8 h-8 mx-auto text-gray-300 animate-bounce" />
+                <p>{lang === "bn" ? "ফিল্টার অনুযায়ী কোনো প্রোডাক্ট পাওয়া যায়নি!" : "No products found for this inventory filter."}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse font-sans">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                      <th className="pb-3">{lang === "bn" ? "প্রোডাক্ট বিবরণ" : "Product Details"}</th>
+                      <th className="pb-3">{lang === "bn" ? "মূল্যমান (Retail vs Sourcing)" : "Valuation (Retail vs Sourcing)"}</th>
+                      <th className="pb-3">{lang === "bn" ? "স্টক বার" : "Inventory Level Bar"}</th>
+                      <th className="pb-3">{lang === "bn" ? "স্টক স্ট্যাটাস" : "Supply Status"}</th>
+                      <th className="pb-3 text-right">{lang === "bn" ? "স্টক পরিবর্তন" : "Quick Adjust Stock"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                    {filteredStockProducts.map((p) => {
+                      const stockPercent = Math.min((p.stock / 100) * 100, 100);
+                      const isDead = !p.salesCount || p.salesCount === 0;
+                      const isLow = p.stock <= 5;
+                      const calculatedSourcingCost = p.costPrice !== undefined ? p.costPrice : p.price * 0.6;
+                      
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="py-3.5 flex items-center gap-3">
+                            <img
+                              src={p.image}
+                              alt={p.name}
+                              className="w-11 h-11 rounded-xl object-cover border shrink-0 bg-slate-50"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div>
+                              <h4 className="font-bold text-gray-900">{lang === "bn" ? p.banglaName || p.name : p.name}</h4>
+                              <div className="flex gap-1.5 items-center mt-0.5">
+                                <span className="text-[10px] font-mono text-gray-400">ID: {p.id}</span>
+                                <span className="text-gray-300">•</span>
+                                <span className="text-[10px] font-mono font-bold text-gray-500 bg-slate-100 px-1.5 py-0.2 rounded">
+                                  {lang === "bn" ? "বিক্রি:" : "Sales:"} {p.salesCount || 0} pcs
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5">
+                            <div className="space-y-0.5 text-xs">
+                              <p className="font-bold text-gray-800">
+                                {lang === "bn" ? "বিক্রয় মূল্য: " : "Retail: "} 
+                                <span className="font-mono text-indigo-600">৳{p.price}</span>
+                              </p>
+                              <p className="text-[10px] text-gray-400 font-bold">
+                                {lang === "bn" ? "ক্রয় মূল্য: " : "Sourcing: "} 
+                                <span className="font-mono">৳{calculatedSourcingCost}</span>
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-3.5 w-48">
+                            <div className="space-y-1 font-mono">
+                              <span className="text-[10px] font-bold text-gray-600">{p.stock} pcs remaining</span>
+                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isLow ? "bg-red-500" : p.stock <= 15 ? "bg-amber-500" : "bg-emerald-500"
+                                  }`}
+                                  style={{ width: `${stockPercent}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-wide ${
+                                p.stock <= 0 
+                                  ? "bg-red-50 text-red-700 border border-red-100" 
+                                  : isLow 
+                                  ? "bg-amber-50 text-amber-700 border border-amber-100" 
+                                  : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                              }`}>
+                                {p.stock <= 0 ? "OUT OF STOCK" : isLow ? "LOW STOCK" : "HEALTHY"}
+                              </span>
+                              
+                              {/* Restock suggestions or Dead stock badges */}
+                              {isDead && (
+                                <span className="px-1.5 py-0.2 text-[8px] font-extrabold uppercase bg-red-100 text-red-800 rounded">
+                                  {lang === "bn" ? "অচল পণ্য (Dead Stock)" : "Dead Stock"}
+                                </span>
+                              )}
+                              {isLow && p.stock > 0 && (
+                                <span className="px-1.5 py-0.2 text-[8px] font-extrabold uppercase bg-amber-100 text-amber-800 rounded animate-pulse">
+                                  {lang === "bn" ? "রিস্টক করুন" : "Restock Needed"}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 text-right">
+                            <div className="flex justify-end items-center gap-1.5">
+                              <input
+                                id={`stock-input-${p.id}`}
+                                type="number"
+                                defaultValue={p.stock}
+                                className="w-16 bg-slate-50 border border-gray-250 rounded-lg px-2 py-1 text-center font-mono text-xs font-bold"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`stock-input-${p.id}`) as HTMLInputElement;
+                                  if (input) {
+                                    const newVal = Number(input.value);
+                                    const updated = products.map(prod => prod.id === p.id ? { ...prod, stock: newVal } : prod);
+                                    onUpdateProducts(updated);
+                                    alert(lang === "bn" ? "স্টক লেভেল সফলভাবে আপডেট হয়েছে!" : "Product stock level updated successfully!");
+                                  }
+                                }}
+                                className="bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg cursor-pointer shadow-xs transition-all"
+                              >
+                                {lang === "bn" ? "আপডেট" : "Update"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

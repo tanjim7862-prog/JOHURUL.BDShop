@@ -21,6 +21,11 @@ export interface Product {
   flashSalePrice?: number;
   sizes?: string[];
   colors?: { name: string; hex: string }[];
+  costPrice?: number;
+  variations?: { name: string; options: string[] }[];
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string;
 }
 
 export enum OrderStatus {
