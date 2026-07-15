@@ -1533,14 +1533,17 @@ export default function AdminPanel({
                         targetPhone = "88" + targetPhone;
                       }
 
+                      // Build the print link URL
+                      const printUrl = `${window.location.origin}${window.location.pathname}?print_supplier=${encodeURIComponent(waSelectedSupplier)}&print_date=${waSelectedDate}`;
+
                       // Build the massive message
                       const formattedDate = new Date(waSelectedDate).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
                         year: 'numeric', month: 'long', day: 'numeric'
                       });
 
                       let msgText = lang === "bn"
-                        ? `*📦 সরবরাহ অর্ডার স্লিপ ও সামারি রিপোর্ট*\n*শপ:* ${waSelectedSupplier.toUpperCase()}\n*তারিখ:* ${formattedDate}\n----------------------------------\n*মোট পার্সেল সংখ্যা:* ${matchingOrders.length} টি\n*মোট আইটেম সংখ্যা:* ${totalItemsToPack} টি\n----------------------------------\n\n`
-                        : `*📦 SUPPLIER BATCH REPORT - ${waSelectedSupplier.toUpperCase()}*\n*Date:* ${formattedDate}\n----------------------------------\n*Total Parcels:* ${matchingOrders.length}\n*Total Items to Pack:* ${totalItemsToPack}\n----------------------------------\n\n`;
+                        ? `*📦 সরবরাহ অর্ডার স্লিপ ও সামারি রিপোর্ট*\n*শপ:* ${waSelectedSupplier.toUpperCase()}\n*তারিখ:* ${formattedDate}\n----------------------------------\n*মোট পার্সেল সংখ্যা:* ${matchingOrders.length} টি\n*মোট আইটেম সংখ্যা:* ${totalItemsToPack} টি\n----------------------------------\n\n🖨️ *লেবেল ও রসিদ প্রিন্ট করার সরাসরি লিংক (Print Slips Link):*\n${printUrl}\n\n`
+                        : `*📦 SUPPLIER BATCH REPORT - ${waSelectedSupplier.toUpperCase()}*\n*Date:* ${formattedDate}\n----------------------------------\n*Total Parcels:* ${matchingOrders.length}\n*Total Items to Pack:* ${totalItemsToPack}\n----------------------------------\n\n🖨️ *Print and Attach Slips Direct Link:*\n${printUrl}\n\n`;
 
                       matchingOrders.forEach((order, idx) => {
                         const itemsForThisShop = order.cartItems.filter(item => {
@@ -1567,11 +1570,34 @@ export default function AdminPanel({
                       });
 
                       msgText += lang === "bn"
-                        ? `দয়া করে উপরের পণ্যগুলো দ্রুত প্যাকেট করে ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`
-                        : `Please package and prepare these products for delivery. Thank you!`;
+                        ? `দয়া করে উপরের পণ্যগুলো প্রিন্ট করা রসিদসহ দ্রুত প্যাকেট করে ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`
+                        : `Please package and prepare these products with the printed slips. Thank you!`;
 
                       const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msgText)}`;
                       window.open(waUrl, "_blank");
+                    };
+
+                    const handleOpenPrintPreview = () => {
+                      if (matchingOrders.length === 0) {
+                        alert(lang === "bn" ? "এই তারিখে এই শপের কোনো রসিদ পাওয়া যায়নি!" : "No order slips found for this shop on this date!");
+                        return;
+                      }
+                      if (waSelectedSupplier === "all") {
+                        alert(lang === "bn" ? "দয়া করে নির্দিষ্ট শপ সিলেক্ট করুন।" : "Please select a specific shop first.");
+                        return;
+                      }
+                      const printUrl = `${window.location.origin}${window.location.pathname}?print_supplier=${encodeURIComponent(waSelectedSupplier)}&print_date=${waSelectedDate}`;
+                      window.open(printUrl, "_blank");
+                    };
+
+                    const handleCopyPrintLink = () => {
+                      if (waSelectedSupplier === "all") {
+                        alert(lang === "bn" ? "দয়া করে নির্দিষ্ট শপ সিলেক্ট করুন।" : "Please select a specific shop first.");
+                        return;
+                      }
+                      const printUrl = `${window.location.origin}${window.location.pathname}?print_supplier=${encodeURIComponent(waSelectedSupplier)}&print_date=${waSelectedDate}`;
+                      navigator.clipboard.writeText(printUrl);
+                      alert(lang === "bn" ? "প্রিন্ট রসিদ লিংক সফলভাবে কপি করা হয়েছে!" : "Direct print slips link successfully copied!");
                     };
 
                     return (
@@ -1587,18 +1613,39 @@ export default function AdminPanel({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={handleWaSend}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          <span>
-                            {lang === "bn" 
-                              ? "১-ক্লিকে হোয়াটসঅ্যাপে সব স্লিপ পাঠান" 
-                              : "Send All Slips to WhatsApp"}
-                          </span>
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={handleWaSend}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>
+                              {lang === "bn" 
+                                ? "১-ক্লিকে হোয়াটসঅ্যাপে সব স্লিপ পাঠান" 
+                                : "Send All Slips to WhatsApp"}
+                            </span>
+                          </button>
+
+                          {waSelectedSupplier !== "all" && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={handleOpenPrintPreview}
+                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[10px] font-black py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200"
+                              >
+                                🖨️ {lang === "bn" ? "সরাসরি প্রিন্ট করুন" : "Direct Print Slips"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCopyPrintLink}
+                                className="bg-slate-50 hover:bg-slate-100 text-slate-800 text-[10px] font-black py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                              >
+                                🔗 {lang === "bn" ? "প্রিন্ট লিংক কপি" : "Copy Print Link"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })()}

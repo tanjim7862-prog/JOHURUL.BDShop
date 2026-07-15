@@ -962,6 +962,286 @@ export default function App() {
     }
   };
 
+  // Supplier Print Intercept Logic
+  const printParams = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const supplier = params.get("print_supplier");
+    const date = params.get("print_date");
+    if (supplier && date) {
+      return { supplier, date };
+    }
+    return null;
+  }, []);
+
+  const matchingPrintOrders = useMemo(() => {
+    if (!printParams) return [];
+    return orders.filter(order => {
+      // Check date match
+      const isDateOk = (() => {
+        if (!order.createdAt) return false;
+        try {
+          const orderDate = new Date(order.createdAt);
+          const y = orderDate.getFullYear();
+          const m = String(orderDate.getMonth() + 1).padStart(2, '0');
+          const d = String(orderDate.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}` === printParams.date;
+        } catch {
+          return false;
+        }
+      })();
+      if (!isDateOk) return false;
+
+      // Check supplier match
+      return order.cartItems.some(item => {
+        const prod = products.find(p => p.id === item.product.id) || item.product;
+        return (prod.supplierShop || "").trim().toLowerCase() === printParams.supplier.trim().toLowerCase();
+      });
+    });
+  }, [printParams, orders, products]);
+
+  if (printParams) {
+    const formattedDate = new Date(printParams.date).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    return (
+      <div className="min-h-screen bg-slate-100 p-4 sm:p-8 font-sans text-gray-900 print:bg-white print:p-0">
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            .no-print { display: none !important; }
+            .print-page { 
+              padding: 0 !important; 
+              margin: 0 !important; 
+              background: white !important;
+            }
+            .print-card {
+              border: 2px solid #000 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              margin-bottom: 20px !important;
+              background: white !important;
+              color: black !important;
+              border-radius: 0 !important;
+              box-shadow: none !important;
+            }
+          }
+        `}} />
+
+        {/* Top Control Bar - Hidden during printing */}
+        <div className="no-print max-w-4xl mx-auto mb-6 bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🖨️</span>
+              <h1 className="text-lg font-black text-[#3730a3]">
+                {lang === "bn" ? "সরবরাহকারী রসিদ প্রিন্ট পোর্টাল" : "Supplier Order Slips Print Console"}
+              </h1>
+            </div>
+            <p className="text-xs text-gray-500 mt-1 font-bold">
+              {lang === "bn"
+                ? `শপ: ${printParams.supplier.toUpperCase()} | তারিখ: ${formattedDate}`
+                : `Shop: ${printParams.supplier.toUpperCase()} | Date: ${formattedDate}`}
+              {" "}({matchingPrintOrders.length} {lang === "bn" ? "টি পার্সেল পাওয়া গেছে" : "parcels found"})
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.print()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-2"
+            >
+              <span>🖨️</span> {lang === "bn" ? "সব স্লিপ প্রিন্ট করুন" : "Print All Slips"}
+            </button>
+            <button
+              onClick={() => {
+                window.location.href = window.location.origin + window.location.pathname;
+              }}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer border border-gray-200"
+            >
+              {lang === "bn" ? "স্টোরে ফিরে যান" : "Go to Main Store"}
+            </button>
+          </div>
+        </div>
+
+        {/* Slips List Container */}
+        <div className="print-page max-w-4xl mx-auto space-y-6">
+          {matchingPrintOrders.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-3xl p-12 text-center shadow-sm">
+              <span className="text-5xl">📦</span>
+              <h2 className="text-lg font-bold text-gray-700 mt-4">
+                {lang === "bn" ? "কোনো রসিদ পাওয়া যায়নি!" : "No slips found!"}
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">
+                {lang === "bn"
+                  ? "নির্বাচিত তারিখে এই সরবরাহকারীর জন্য কোনো অর্ডার পাওয়া যায়নি।"
+                  : "No orders found for this supplier on the selected date."}
+              </p>
+            </div>
+          ) : (
+            matchingPrintOrders.map((order, idx) => {
+              // Filter cart items to only show products belonging to THIS supplier
+              const supplierItems = order.cartItems.filter(item => {
+                const prod = products.find(p => p.id === item.product.id) || item.product;
+                return (prod.supplierShop || "").trim().toLowerCase() === printParams.supplier.trim().toLowerCase();
+              });
+
+              return (
+                <div key={order.id} className="print-card bg-white border-2 border-gray-300 rounded-2xl p-6 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                  {/* Decorative Scissors Line on Screen */}
+                  <div className="no-print absolute top-0 left-0 right-0 h-1 bg-slate-200 border-t border-dashed border-slate-400"></div>
+                  
+                  {/* Slip Header */}
+                  <div className="flex justify-between items-start border-b border-gray-200 pb-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded bg-[#3730a3] text-white flex items-center justify-center font-bold text-[10px]">
+                          J
+                        </div>
+                        <span className="text-xs font-black tracking-tight text-gray-900">
+                          JOHURUL<span className="text-[#3730a3]">.BDShop</span>
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                        {lang === "bn" ? `সরবরাহকারী: ${printParams.supplier}` : `Supplier: ${printParams.supplier}`}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="bg-slate-100 px-3 py-1 rounded text-[11px] font-black font-mono text-slate-800 border border-slate-200 inline-block">
+                        ORDER ID: #{order.id}
+                      </div>
+                      <p className="text-[9px] text-gray-400 mt-1 font-semibold">
+                        {lang === "bn" ? `রসিদ নং: ${idx + 1} / ${matchingPrintOrders.length}` : `Slip: ${idx + 1} of ${matchingPrintOrders.length}`}
+                        {" | "} {formattedDate}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Slip Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Side: Delivery Address */}
+                    <div className="space-y-3 border-r border-gray-100 pr-0 md:pr-4 print:border-r">
+                      <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                        <span>📍</span> {lang === "bn" ? "প্রাপকের বিবরণী (Shipping Info)" : "Receiver Details"}
+                      </h3>
+                      
+                      <div className="space-y-1 bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 print:bg-white">
+                        <p className="text-sm font-extrabold text-gray-900">
+                          {order.customerName}
+                        </p>
+                        
+                        {/* Huge highlight mobile number */}
+                        <p className="text-base font-black text-[#3730a3] font-mono tracking-wide py-0.5 print:text-black">
+                          📞 {order.customerPhone}
+                        </p>
+                        
+                        <p className="text-xs text-gray-700 font-medium leading-relaxed mt-1">
+                          {order.customerAddress}
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-500 pt-1 border-t border-dashed border-gray-200 mt-1">
+                          <div>
+                            <span className="text-[9px] text-gray-400 uppercase block">{lang === "bn" ? "থানা" : "Thana"}</span>
+                            <span className="text-gray-800 font-extrabold">{order.customerThana || "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-gray-400 uppercase block">{lang === "bn" ? "জেলা" : "District"}</span>
+                            <span className="text-gray-800 font-extrabold">{order.customerDistrict}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Side: Products to Pack */}
+                    <div className="space-y-3 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                          <span>📦</span> {lang === "bn" ? "পণ্য ও বিবরণী (Items to Pack)" : "Products to Pack"}
+                        </h3>
+
+                        <div className="space-y-2 mt-2">
+                          {supplierItems.map((item, itemIdx) => {
+                            const prod = products.find(p => p.id === item.product.id) || item.product;
+                            const pName = lang === "bn" ? prod.banglaName || prod.name : prod.name;
+                            return (
+                              <div key={itemIdx} className="flex gap-3 bg-white p-2 rounded-xl border border-gray-100 items-center justify-between">
+                                <div className="flex gap-2.5 items-center min-w-0">
+                                  {prod.image && (
+                                    <img
+                                      src={prod.image}
+                                      alt={prod.name}
+                                      className="w-10 h-10 rounded-md object-cover border border-gray-150 shrink-0"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 truncate">
+                                      {pName}
+                                    </p>
+                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                      {item.selectedSize && (
+                                        <span className="text-[8px] font-black bg-slate-100 text-slate-700 px-1 py-0.2 rounded">
+                                          Size: {item.selectedSize}
+                                        </span>
+                                      )}
+                                      {item.selectedColor && (
+                                        <span className="text-[8px] font-black bg-slate-100 text-slate-700 px-1 py-0.2 rounded">
+                                          Color: {item.selectedColor}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <span className="text-xs font-black text-white bg-slate-900 px-2.5 py-1 rounded font-mono print:text-black print:border print:bg-white">
+                                    QTY: {item.quantity}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Checkboxes for the packer */}
+                      <div className="border-t border-dashed border-gray-200 pt-3 flex items-center justify-between gap-2 mt-2">
+                        <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">
+                          {lang === "bn" ? "প্যাকিং চেকলিস্ট:" : "Packer Checklist:"}
+                        </span>
+                        <div className="flex gap-3 text-[10px] font-black text-gray-600">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" className="rounded text-[#3730a3] focus:ring-[#3730a3] w-3.5 h-3.5" />
+                            <span>{lang === "bn" ? "প্যাকড" : "Packed"}</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" className="rounded text-[#3730a3] focus:ring-[#3730a3] w-3.5 h-3.5" />
+                            <span>{lang === "bn" ? "ভেরিফাইড" : "Verified"}</span>
+                          </label>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Slip Footer Message / Cut indicator */}
+                  <div className="border-t border-gray-100 pt-3 mt-4 flex justify-between items-center text-[9px] text-gray-400 font-bold">
+                    <span>JOHURUL.BDShop - {lang === "bn" ? "ধন্যবাদ!" : "Thank you!"}</span>
+                    <span className="no-print italic flex items-center gap-1">
+                      ✂️ ------------------------------------------------------------------------------------------
+                    </span>
+                    <span className="print:block hidden">
+                      Powered by JOHURUL.BDShop OS
+                    </span>
+                  </div>
+
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans text-gray-900 flex flex-col antialiased">
       {/* 1. JOHURUL.BDShop Topbar (টপবার) */}
