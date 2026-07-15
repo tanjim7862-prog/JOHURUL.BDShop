@@ -8,6 +8,8 @@ import ProductDetails from "./components/ProductDetails";
 import TrackingTimeline from "./components/TrackingTimeline";
 import FacebookAdPreview from "./components/FacebookAdPreview";
 import AdminPanel from "./components/AdminPanel";
+import SmartSearchBar from "./components/SmartSearchBar";
+import CustomerDashboard from "./components/CustomerDashboard";
 import { initFacebookPixel, initTikTokPixel, trackPixelEvent } from "./utils/pixel";
 import watchBannerImg from "./assets/images/watch_banner_1784030925146.jpg";
 import { 
@@ -49,7 +51,7 @@ export default function App() {
   }, []);
 
   // Core navigation state
-  const [currentView, setCurrentView] = useState<"shop" | "track" | "campaign" | "admin">("shop");
+  const [currentView, setCurrentView] = useState<"shop" | "track" | "campaign" | "admin" | "account">("shop");
 
   // Core admin credentials and session state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -320,6 +322,31 @@ export default function App() {
     } catch (err) {
       console.error("Failed to sync orders with Firestore:", err);
     }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    const updatedOrders = orders.map((o) => {
+      if (o.id === orderId) {
+        return {
+          ...o,
+          status: OrderStatus.CANCELLED,
+          trackingHistory: [
+            ...o.trackingHistory,
+            {
+              status: OrderStatus.CANCELLED,
+              title: "Order Cancelled",
+              banglaTitle: "অর্ডার বাতিল",
+              description: "Customer requested order cancellation.",
+              banglaDescription: "গ্রাহকের অনুরোধে অর্ডারটি বাতিল করা হয়েছে।",
+              timestamp: new Date().toLocaleString(),
+              completed: true
+            }
+          ]
+        };
+      }
+      return o;
+    });
+    await updateOrdersAndSync(updatedOrders);
   };
 
   // UI state
@@ -936,24 +963,15 @@ export default function App() {
             </div>
           </div>
 
-          {/* JOHURUL.BDShop iconic Red-themed Search Bar inside Header */}
-          <div className="w-full md:max-w-2xl flex rounded border-indigo-800 border-indigo-800lue-100 border-[#3730a3] overflow-hidden shadow-xs">
-            <input
-              id="product-search-input"
-              type="text"
-              placeholder={lang === "bn" ? "জহুরুল বিডি-শপ এ অরিজিনাল প্রোডাক্ট খুঁজুন..." : "Search original products on JOHURUL.BDShop..."}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-sm text-gray-800 px-4 py-2.5 outline-none placeholder-gray-400 font-normal"
-            />
-            <button 
-              onClick={() => setCurrentView("shop")}
-              className="px-6 bg-[#3730a3] hover:bg-[#4338ca] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Search className="w-4 h-4" />
-              <span>{lang === "bn" ? "খুঁজুন" : "SEARCH"}</span>
-            </button>
-          </div>
+          {/* JOHURUL.BDShop iconic Smart Search Bar with Auto-suggestions inside Header */}
+          <SmartSearchBar
+            products={products}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onSelectProduct={(product) => setSelectedProductDetails(product)}
+            lang={lang}
+            setCurrentView={setCurrentView}
+          />
 
           {/* Cart and Switch views area */}
           <div className="flex items-center gap-4 shrink-0">
@@ -1008,6 +1026,17 @@ export default function App() {
           >
             📢 {lang === "bn" ? "ফেসবুক অ্যাড ক্রিয়েটর" : "FB Ad Maker"}
           </button>
+          <button
+            id="nav-tab-account"
+            onClick={() => setCurrentView("account")}
+            className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
+              currentView === "account"
+                ? "bg-[#3730a3] text-white shadow-sm"
+                : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
+            }`}
+          >
+            👤 {lang === "bn" ? "আমার অ্যাকাউন্ট" : "My Account"}
+          </button>
           {showAdminEntryPoints && (
             <button
               id="nav-tab-admin"
@@ -1049,6 +1078,14 @@ export default function App() {
         >
           <span className="text-lg">📢</span>
           <span>{lang === "bn" ? "অ্যাড মেকার" : "Ads"}</span>
+        </button>
+        <button
+          id="mobile-nav-account"
+          onClick={() => setCurrentView("account")}
+          className={`flex flex-col items-center gap-0.5 ${currentView === "account" ? "text-[#3730a3]" : "text-gray-400"}`}
+        >
+          <span className="text-lg">👤</span>
+          <span>{lang === "bn" ? "প্রোফাইল" : "Profile"}</span>
         </button>
         {showAdminEntryPoints && (
           <button
@@ -1618,6 +1655,18 @@ export default function App() {
               </div>
             )}
           </div>
+        )}
+
+        {/* VIEW 5: CUSTOMER ACCOUNT DASHBOARD */}
+        {currentView === "account" && (
+          <CustomerDashboard
+            orders={orders}
+            onCancelOrder={handleCancelOrder}
+            lang={lang}
+            products={products}
+            onSelectProduct={(product) => setSelectedProductDetails(product)}
+            setCurrentView={setCurrentView}
+          />
         )}
 
       </main>
