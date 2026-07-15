@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Product, Order, OrderStatus } from "../types";
+import { Product, Order, OrderStatus, Coupon } from "../types";
 import { createDefaultTrackingHistory, updateTrackingHistory } from "../data";
 import watchBannerImg from "../assets/images/watch_banner_1784030925146.jpg";
 import { 
@@ -22,6 +22,8 @@ interface AdminPanelProps {
   onChangeTtPixelId: (id: string) => void;
   heroImageUrl: string;
   onChangeHeroImageUrl: (url: string) => void;
+  coupons?: Coupon[];
+  onUpdateCoupons?: (coupons: Coupon[]) => void;
 }
 
 export default function AdminPanel({
@@ -35,7 +37,9 @@ export default function AdminPanel({
   ttPixelId,
   onChangeTtPixelId,
   heroImageUrl,
-  onChangeHeroImageUrl
+  onChangeHeroImageUrl,
+  coupons = [],
+  onUpdateCoupons
 }: AdminPanelProps) {
   type AdminTab = 
     | "analytics"
@@ -53,7 +57,8 @@ export default function AdminPanel({
     | "delivery"
     | "sms"
     | "roles"
-    | "users";
+    | "users"
+    | "coupons";
 
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState<boolean>(false);
@@ -116,6 +121,15 @@ export default function AdminPanel({
   ]);
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffRole, setNewStaffRole] = useState("Sales Manager");
+
+  // Dynamic Coupon form states
+  const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponType, setNewCouponType] = useState<"percentage" | "flat">("percentage");
+  const [newCouponValue, setNewCouponValue] = useState<number>(0);
+  const [newCouponMinPurchase, setNewCouponMinPurchase] = useState<number>(0);
+  const [newCouponExpiry, setNewCouponExpiry] = useState("2026-12-31");
+  const [newCouponDescEn, setNewCouponDescEn] = useState("");
+  const [newCouponDescBn, setNewCouponDescBn] = useState("");
 
   const [expenses, setExpenses] = useState([
     { id: "E-401", description: "Meta Facebook Ads Boost", amount: 6500, category: "Marketing", date: "2026-07-14" },
@@ -441,6 +455,7 @@ export default function AdminPanel({
     { id: "abandoned", labelBn: "অসম্পূর্ণ অর্ডার", labelEn: "Abandoned Orders", icon: ShoppingCart },
     { id: "customers", labelBn: "গ্রাহক তালিকা", labelEn: "Customers", icon: Users },
     { id: "accounts", labelBn: "হিসাব-নিকাশ", labelEn: "Accounts", icon: CreditCard },
+    { id: "coupons", labelBn: "কুপন ও ডিসকাউন্ট", labelEn: "Coupons", icon: Percent },
     { id: "products", labelBn: "প্রোডাক্ট ম্যানেজার", labelEn: "Products", icon: Package },
     { id: "categories", labelBn: "ক্যাটাগরি", labelEn: "Categories", icon: Layers },
     { id: "authors", labelBn: "লেখকবৃন্দ", labelEn: "Authors", icon: Feather },
@@ -2316,6 +2331,248 @@ export default function AdminPanel({
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER COUPONS & DISCOUNTS */}
+      {activeTab === "coupons" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Create Coupon Panel */}
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                {lang === "bn" ? "নতুন কুপন তৈরি করুন" : "Create New Coupon"}
+              </h4>
+              
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newCouponCode) return;
+                  
+                  const newCoupon: Coupon = {
+                    id: `c-${Date.now()}`,
+                    code: newCouponCode.trim().toUpperCase(),
+                    type: newCouponType,
+                    value: Number(newCouponValue),
+                    minPurchase: Number(newCouponMinPurchase),
+                    expiryDate: newCouponExpiry,
+                    descriptionEn: newCouponDescEn || `Save ${newCouponType === "percentage" ? newCouponValue + "%" : newCouponValue + " BDT"} on your order`,
+                    descriptionBn: newCouponDescBn || `আপনার অর্ডারে ${newCouponType === "percentage" ? newCouponValue + "%" : newCouponValue + " টাকা"} ডিসকাউন্ট পান`,
+                    isActive: true
+                  };
+                  
+                  if (onUpdateCoupons) {
+                    onUpdateCoupons([...coupons, newCoupon]);
+                  }
+                  
+                  // Reset form
+                  setNewCouponCode("");
+                  setNewCouponValue(0);
+                  setNewCouponMinPurchase(0);
+                  setNewCouponDescEn("");
+                  setNewCouponDescBn("");
+                  alert(lang === "bn" ? "কুপন কোড সফলভাবে যোগ করা হয়েছে!" : "Coupon successfully added!");
+                }}
+                className="space-y-3"
+              >
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                    {lang === "bn" ? "কুপন কোড (ইংরেজি বড় হাতের অক্ষরের)" : "Coupon Code (uppercase)"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. WINTER30"
+                    value={newCouponCode}
+                    onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                      {lang === "bn" ? "ডিসকাউন্ট টাইপ" : "Type"}
+                    </label>
+                    <select
+                      value={newCouponType}
+                      onChange={(e) => setNewCouponType(e.target.value as "percentage" | "flat")}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    >
+                      <option value="percentage">{lang === "bn" ? "শতকরা (%)" : "Percentage (%)"}</option>
+                      <option value="flat">{lang === "bn" ? "ফ্ল্যাট (৳)" : "Flat Amount (৳)"}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                      {lang === "bn" ? "ডিসকাউন্ট মান" : "Value"}
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={newCouponValue}
+                      onChange={(e) => setNewCouponValue(Number(e.target.value))}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                      {lang === "bn" ? "সর্বনিম্ন ক্রয় (৳)" : "Min Spend (৳)"}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newCouponMinPurchase}
+                      onChange={(e) => setNewCouponMinPurchase(Number(e.target.value))}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                      {lang === "bn" ? "মেয়াদ শেষ" : "Expiry Date"}
+                    </label>
+                    <input
+                      type="date"
+                      value={newCouponExpiry}
+                      onChange={(e) => setNewCouponExpiry(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                    {lang === "bn" ? "বিবরণ (English)" : "Description (English)"}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Save 30% on entire winter catalog"
+                    value={newCouponDescEn}
+                    onChange={(e) => setNewCouponDescEn(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
+                    {lang === "bn" ? "বিবরণ (বাংলা)" : "Description (Bangla)"}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="যেমনঃ ৩০% ফ্ল্যাট ছাড় পান"
+                    value={newCouponDescBn}
+                    onChange={(e) => setNewCouponDescBn(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-blue-200"
+                >
+                  {lang === "bn" ? "কুপন তৈরি করুন" : "Add Coupon Code"}
+                </button>
+              </form>
+            </div>
+
+            {/* Coupons List Panel */}
+            <div className="lg:col-span-2 bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                  {lang === "bn" ? "সক্রিয় কুপন কোড সমূহ" : "Active Coupon Vouchers"}
+                </h4>
+                <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                  {coupons.length} {lang === "bn" ? "টি কুপন" : "Coupons"}
+                </span>
+              </div>
+
+              {coupons.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 font-bold text-xs space-y-2">
+                  <Percent className="w-8 h-8 mx-auto text-gray-300 animate-bounce" />
+                  <p>{lang === "bn" ? "কোনো কুপন কোড পাওয়া যায়নি!" : "No custom coupon codes configured."}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-black uppercase tracking-wider">
+                        <th className="pb-3">{lang === "bn" ? "কোড" : "Code"}</th>
+                        <th className="pb-3">{lang === "bn" ? "ডিসকাউন্ট" : "Discount"}</th>
+                        <th className="pb-3">{lang === "bn" ? "ন্যূনতম ক্রয়" : "Min Spend"}</th>
+                        <th className="pb-3">{lang === "bn" ? "মেয়াদ" : "Expiry"}</th>
+                        <th className="pb-3">{lang === "bn" ? "অবস্থা" : "Status"}</th>
+                        <th className="pb-3 text-right">{lang === "bn" ? "অ্যাকশন" : "Actions"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {coupons.map((coupon) => (
+                        <tr key={coupon.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-3 font-mono font-black text-gray-900">
+                            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                              {coupon.code}
+                            </span>
+                          </td>
+                          <td className="py-3 font-bold text-gray-800">
+                            {coupon.type === "percentage" ? `${coupon.value}%` : `৳${coupon.value}`}
+                          </td>
+                          <td className="py-3 font-bold text-gray-600">
+                            ৳{coupon.minPurchase}
+                          </td>
+                          <td className="py-3 text-gray-500 font-mono text-[10px]">
+                            {coupon.expiryDate || "No limit"}
+                          </td>
+                          <td className="py-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onUpdateCoupons) {
+                                  const updated = coupons.map(c => 
+                                    c.id === coupon.id ? { ...c, isActive: !c.isActive } : c
+                                  );
+                                  onUpdateCoupons(updated);
+                                }
+                              }}
+                              className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all cursor-pointer ${
+                                coupon.isActive 
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                  : "bg-slate-100 text-slate-500 border border-slate-200"
+                              }`}
+                            >
+                              {coupon.isActive 
+                                ? (lang === "bn" ? "সক্রিয়" : "Active")
+                                : (lang === "bn" ? "নিষ্ক্রিয়" : "Inactive")
+                              }
+                            </button>
+                          </td>
+                          <td className="py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(lang === "bn" ? "আপনি কি এই কুপনটি ডিলিট করতে চান?" : "Are you sure you want to delete this coupon?")) {
+                                  if (onUpdateCoupons) {
+                                    onUpdateCoupons(coupons.filter(c => c.id !== coupon.id));
+                                  }
+                                }
+                              }}
+                              className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>

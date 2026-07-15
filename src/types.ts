@@ -15,6 +15,10 @@ export interface Product {
   images?: string[]; // Multiple additional landing page images (3-4 images)
   landingDescription?: string; // Long landing page custom description
   banglaLandingDescription?: string; // Long landing page custom description in Bangla
+  badge?: "new" | "hot" | "sale";
+  salesCount?: number;
+  isFlashSale?: boolean;
+  flashSalePrice?: number;
 }
 
 export enum OrderStatus {
@@ -39,6 +43,18 @@ export interface TrackingStep {
 export interface CartItem {
   product: Product;
   quantity: number;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  type: "percentage" | "flat";
+  value: number;
+  minPurchase: number;
+  expiryDate?: string;
+  descriptionEn: string;
+  descriptionBn: string;
+  isActive: boolean;
 }
 
 export interface Order {

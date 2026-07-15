@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Product, CartItem, Order, OrderStatus } from "./types";
+import { Product, CartItem, Order, OrderStatus, Coupon } from "./types";
 import { INITIAL_PRODUCTS, BANGLADESH_DIVISIONS, DIVISION_TO_DISTRICTS, DISTRICT_TO_THANAS, createDefaultTrackingHistory } from "./data";
 import ProductCard from "./components/ProductCard";
+import FlashSale from "./components/FlashSale";
+import FilterSidebar, { FilterSettings } from "./components/FilterSidebar";
 import TrackingTimeline from "./components/TrackingTimeline";
 import FacebookAdPreview from "./components/FacebookAdPreview";
 import AdminPanel from "./components/AdminPanel";
@@ -213,6 +215,43 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Wishlist and Filter States
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    const saved = localStorage.getItem("mystore_wishlist");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const maxProductPrice = useMemo(() => {
+    if (products.length === 0) return 5000;
+    const prices = products.map((p) => p.isFlashSale && p.flashSalePrice ? p.flashSalePrice : p.price);
+    return Math.max(...prices, 5000);
+  }, [products]);
+
+  const [filters, setFilters] = useState<FilterSettings>(() => ({
+    priceMin: 0,
+    priceMax: 10000, // will be updated dynamically or high default
+    minRating: 0,
+    stockStatus: "all",
+    sortBy: "popularity"
+  }));
+
+  // Ensure default priceMax fits max product price on mount
+  useEffect(() => {
+    setFilters(f => ({ ...f, priceMax: maxProductPrice }));
+  }, [maxProductPrice]);
+
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
+  const handleToggleWishlist = (product: Product) => {
+    setWishlist((prev) => {
+      const updated = prev.includes(product.id)
+        ? prev.filter((id) => id !== product.id)
+        : [...prev, product.id];
+      localStorage.setItem("mystore_wishlist", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   // Load products and orders from Firebase on mount (Stale-While-Revalidate)
   useEffect(() => {
     async function fetchFirebaseData() {
@@ -338,6 +377,45 @@ export default function App() {
   const [couponCode, setCouponCode] = useState<string>("");
   const [activeCouponNotification, setActiveCouponNotification] = useState<string | null>(null);
 
+  const [coupons, setCoupons] = useState<Coupon[]>(() => {
+    const saved = localStorage.getItem("mystore_coupons");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return [
+      {
+        id: "c-1",
+        code: "FB20",
+        type: "percentage",
+        value: 20,
+        minPurchase: 0,
+        expiryDate: "2026-12-31",
+        descriptionEn: "Facebook Ad Campaign Special 20% discount",
+        descriptionBn: "ফেসবুক অ্যাড স্পেশাল ২০% ডিসকাউন্ট",
+        isActive: true
+      },
+      {
+        id: "c-2",
+        code: "SAVE100",
+        type: "flat",
+        value: 100,
+        minPurchase: 1000,
+        expiryDate: "2026-12-31",
+        descriptionEn: "Get 100 BDT flat discount on minimum purchase of 1000 BDT",
+        descriptionBn: "১০০০ টাকা ক্রয়ে ১০০ টাকা ফ্ল্যাট ডিসকাউন্ট",
+        isActive: true
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("mystore_coupons", JSON.stringify(coupons));
+  }, [coupons]);
+
   // Sync District selection when Division changes
   useEffect(() => {
     const districts = DIVISION_TO_DISTRICTS[customerDivision] || [];
@@ -398,9 +476,16 @@ export default function App() {
     }
 
     if (coupon) {
-      const upperCoupon = coupon.toUpperCase();
+      const upperCoupon = coupon.trim().toUpperCase();
       setCouponCode(upperCoupon);
-      if (upperCoupon === "FB20") {
+      const matched = coupons.find(c => c.code.toUpperCase() === upperCoupon && c.isActive);
+      if (matched) {
+        setActiveCouponNotification(
+          lang === "bn" 
+            ? `🔥 কুপন কোড '${matched.code}' যোগ করা হয়েছে! (${matched.descriptionBn})` 
+            : `🔥 Coupon code '${matched.code}' applied successfully! (${matched.descriptionEn})`
+        );
+      } else if (upperCoupon === "FB20") {
         setActiveCouponNotification(
           lang === "bn" 
             ? "🔥 ফেসবুক ক্যাম্পেইন অফার অ্যাক্টিভ! ২০% ডিসকাউন্ট যোগ হয়েছে।" 
@@ -408,7 +493,7 @@ export default function App() {
         );
       }
     }
-  }, [products, lang]);
+  }, [products, lang, coupons]);
 
   // Cart operations
   const handleAddToCart = (product: Product, quantity: number = 1) => {
@@ -491,12 +576,27 @@ export default function App() {
   // Cart math
   const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   
+  // Find matching active coupon
+  const matchedCoupon = useMemo(() => {
+    const cleanCode = couponCode.trim().toUpperCase();
+    if (!cleanCode) return null;
+    return coupons.find(c => c.code.toUpperCase() === cleanCode && c.isActive);
+  }, [couponCode, coupons]);
+
   const discountAmount = useMemo(() => {
-    if (couponCode.toUpperCase() === "FB20") {
-      return Math.round(cartSubtotal * 0.20);
+    if (!matchedCoupon) {
+      if (couponCode.toUpperCase() === "FB20") {
+        return Math.round(cartSubtotal * 0.20);
+      }
+      return 0;
     }
-    return 0;
-  }, [couponCode, cartSubtotal]);
+    if (cartSubtotal < matchedCoupon.minPurchase) return 0;
+    if (matchedCoupon.type === "percentage") {
+      return Math.round(cartSubtotal * (matchedCoupon.value / 100));
+    } else {
+      return Math.min(matchedCoupon.value, cartSubtotal);
+    }
+  }, [matchedCoupon, couponCode, cartSubtotal]);
 
   // Dhaka delivery is 80 BDT, outside Dhaka is 150 BDT
   const deliveryCharge = useMemo(() => {
@@ -555,16 +655,50 @@ export default function App() {
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    const result = products.filter((p) => {
       const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+      
       const term = searchQuery.toLowerCase();
       const matchesSearch = 
         p.name.toLowerCase().includes(term) || 
         (p.banglaName && p.banglaName.toLowerCase().includes(term)) ||
         p.category.toLowerCase().includes(term);
-      return matchesCategory && matchesSearch;
+
+      const activePrice = p.isFlashSale && p.flashSalePrice ? p.flashSalePrice : p.price;
+      const matchesPrice = activePrice >= filters.priceMin && activePrice <= filters.priceMax;
+
+      const matchesRating = p.rating >= filters.minRating;
+
+      let matchesStock = true;
+      if (filters.stockStatus === "in_stock") {
+        matchesStock = p.stock > 0;
+      } else if (filters.stockStatus === "out_of_stock") {
+        matchesStock = p.stock <= 0;
+      }
+
+      return matchesCategory && matchesSearch && matchesPrice && matchesRating && matchesStock;
     });
-  }, [products, selectedCategory, searchQuery]);
+
+    // Apply sorting
+    if (filters.sortBy === "newest") {
+      return [...result].sort((a, b) => Number(b.id) - Number(a.id));
+    } else if (filters.sortBy === "price_low_high") {
+      return [...result].sort((a, b) => {
+        const ap = a.isFlashSale && a.flashSalePrice ? a.flashSalePrice : a.price;
+        const bp = b.isFlashSale && b.flashSalePrice ? b.flashSalePrice : b.price;
+        return ap - bp;
+      });
+    } else if (filters.sortBy === "price_high_low") {
+      return [...result].sort((a, b) => {
+        const ap = a.isFlashSale && a.flashSalePrice ? a.flashSalePrice : a.price;
+        const bp = b.isFlashSale && b.flashSalePrice ? b.flashSalePrice : b.price;
+        return bp - ap;
+      });
+    } else {
+      // default: popularity / salesCount desc
+      return [...result].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
+    }
+  }, [products, selectedCategory, searchQuery, filters]);
 
   // Order submission
   const handlePlaceOrder = (e: React.FormEvent) => {
@@ -1071,148 +1205,89 @@ export default function App() {
             </div>
 
             {/* DARAJ FLASH SALE (ফ্ল্যাশ সেল) */}
-            <div className="bg-white rounded-md border border-gray-150 shadow-xs overflow-hidden">
-              
-              {/* Flash Sale Header */}
-              <div className="px-4 py-3 border-indigo-800 border-gray-150 bg-[#fbfbfb] flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-4">
-                  <h3 className="text-sm font-black text-[#3730a3] uppercase tracking-wide flex items-center gap-1">
-                    <span>⚡</span> {lang === "bn" ? "ফ্ল্যাশ ডিল" : "JOHURUL.BDShop Flash Deals"}
-                  </h3>
-                  
-                  {/* Countdown Timer in JOHURUL.BDShop Blue style */}
-                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                    <span className="text-gray-400 font-normal">{lang === "bn" ? "শেষ হতে বাকি:" : "Ending in:"}</span>
-                    <span className="bg-[#3730a3] text-white px-1.5 py-0.5 rounded text-xs font-mono">
-                      {timeLeft.hours.toString().padStart(2, "0")}
-                    </span>
-                    <span className="text-[#3730a3] font-black">:</span>
-                    <span className="bg-[#3730a3] text-white px-1.5 py-0.5 rounded text-xs font-mono">
-                      {timeLeft.minutes.toString().padStart(2, "0")}
-                    </span>
-                    <span className="text-[#3730a3] font-black">:</span>
-                    <span className="bg-[#3730a3] text-white px-1.5 py-0.5 rounded text-xs font-mono">
-                      {timeLeft.seconds.toString().padStart(2, "0")}
-                    </span>
-                  </div>
-                </div>
-                
-                <button 
-                  onClick={() => {
-                    const el = document.getElementById("just-for-you-anchor");
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                  }}
-                  className="text-xs text-[#3730a3] hover:text-white hover:bg-[#3730a3] font-bold border border-[#3730a3] px-2.5 py-1 rounded transition-all"
-                >
-                  {lang === "bn" ? "আরও প্রোডাক্ট দেখুন" : "SHOP MORE"}
-                </button>
-              </div>
-
-              {/* Flash Sale Products Grid with progress meters */}
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products.slice(0, 3).map((prod) => {
-                  const fakeSold = (parseInt(prod.id) * 4) + 2;
-                  const percentSold = Math.round((fakeSold / (prod.stock + fakeSold)) * 100);
-
-                  return (
-                    <div 
-                      key={`flash-${prod.id}`}
-                      className="border border-gray-100 hover:border-indigo-800lue-200 p-3 rounded-lg flex gap-4 bg-white relative hover:shadow-sm transition-all cursor-pointer"
-                      onClick={() => setSelectedProductDetails(prod)}
-                    >
-                      {/* Image */}
-                      <img 
-                        src={prod.image} 
-                        alt={prod.name}
-                        className="w-20 h-20 object-cover rounded border border-gray-50 shrink-0" 
-                        referrerPolicy="no-referrer"
-                      />
-                      
-                      {/* Specs */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between">
-                        <div>
-                          <h4 className="text-xs font-semibold text-gray-800 truncate">
-                            {lang === "bn" ? prod.banglaName || prod.name : prod.name}
-                          </h4>
-                          <div className="flex items-baseline gap-1.5 mt-1">
-                            <span className="text-sm font-bold text-[#3730a3]">৳{prod.price}</span>
-                            {prod.originalPrice && (
-                              <span className="text-[10px] text-gray-400 line-through">৳{prod.originalPrice}</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Sold Meter bar */}
-                        <div>
-                          <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-2">
-                            <div 
-                              className="bg-[#3730a3] h-full rounded-full transition-all duration-1000" 
-                              style={{ width: `${percentSold}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-[9px] text-gray-500 font-semibold block mt-1">
-                            🔥 {fakeSold} {lang === "bn" ? "টি বিক্রি হয়েছে" : "sold"} · {prod.stock} {lang === "bn" ? "বাকি আছে" : "left"}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Accent corner label */}
-                      <span className="absolute top-2 right-2 bg-indigo-50 text-indigo-900lue-600lue-600 text-[8px] font-extrabold px-1 py-0.5 rounded">
-                        HOT
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <FlashSale
+              products={products}
+              lang={lang}
+              onViewDetails={setSelectedProductDetails}
+              onAddToCart={(p) => handleAddToCart(p, 1)}
+              onOrderNow={handleOrderNow}
+              wishlistIds={wishlist}
+              onToggleWishlist={handleToggleWishlist}
+            />
 
             {/* "Just For You" Title Anchor */}
             <div id="just-for-you-anchor" className="pt-4 flex flex-col sm:flex-row items-center justify-between border-indigo-800 border-gray-200 pb-3 gap-3">
-              <h2 className="text-indigo-900lue-600ase sm:text-lg font-black text-[#212121] uppercase tracking-wide flex items-center gap-1.5">
+              <h2 className="text-indigo-900 sm:text-lg font-black text-[#212121] uppercase tracking-wide flex items-center gap-1.5">
                 <span className="w-1.5 h-6 bg-[#3730a3] rounded-xs inline-block"></span>
                 {lang === "bn" ? "জাস্ট ফর ইউ (প্রোডাক্ট কালেকশন)" : "Just For You (Personalized Catalog)"}
               </h2>
-              
-              {/* Category Filters inside Just For You */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
-                {categories.map((cat) => (
-                  <button
-                    id={`cat-btn-${cat}`}
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold tracking-wide uppercase shrink-0 cursor-pointer transition-all ${
-                      selectedCategory === cat
-                        ? "bg-[#3730a3] text-white shadow-xs"
-                        : "bg-white text-gray-500 hover:text-[#3730a3] border border-gray-100 hover:border-gray-200"
-                    }`}
-                  >
-                    {getCategoryDisplayName(cat)}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            {/* Store Grid of Products */}
-            {filteredProducts.length === 0 ? (
-              <div className="text-indigo-900enter py-16 bg-white border border-gray-100 rounded-lg p-6">
-                <span className="text-indigo-900lue-600xl">🔍</span>
-                <h3 className="mt-4 text-indigo-900lue-600ase font-bold text-gray-800">{lang === "bn" ? "কোনো প্রোডাক্ট পাওয়া যায়নি" : "No products match your search"}</h3>
-                <p className="text-xs text-gray-400 mt-1">{lang === "bn" ? "অনুগ্রহ করে অন্য কোনো ক্যাটাগরি ট্রাই করুন।" : "Try checking other categories or tags."}</p>
+            {/* Advanced Filtering & Product Catalog Layout */}
+            <div className="flex flex-col md:flex-row gap-6 items-start">
+              {/* Sidebar Filter Panel */}
+              <FilterSidebar
+                filters={filters}
+                onChangeFilters={setFilters}
+                maxProductPrice={maxProductPrice}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+                getCategoryDisplayName={getCategoryDisplayName}
+                lang={lang}
+                isOpenMobile={isFilterDrawerOpen}
+                onCloseMobile={() => setIsFilterDrawerOpen(false)}
+              />
+
+              {/* Catalog Product Grid Container */}
+              <div className="flex-1 w-full space-y-4">
+                {/* Mobile Filter Button and active count */}
+                <div className="flex items-center justify-between gap-3 md:hidden">
+                  <button
+                    onClick={() => setIsFilterDrawerOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] rounded-xl text-xs font-black transition-all border border-indigo-100 cursor-pointer"
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>{lang === "bn" ? "ফিল্টার ও সর্ট" : "Filters & Sorting"}</span>
+                  </button>
+
+                  <span className="text-[10px] text-gray-400 font-bold">
+                    {filteredProducts.length} {lang === "bn" ? "টি প্রোডাক্ট পাওয়া গেছে" : "Products Found"}
+                  </span>
+                </div>
+
+                {/* Grid List of Catalog Products */}
+                {filteredProducts.length === 0 ? (
+                  <div className="text-center py-16 bg-white border border-gray-100 rounded-3xl p-6">
+                    <span className="text-3xl">🔍</span>
+                    <h3 className="mt-4 text-base font-bold text-gray-800">
+                      {lang === "bn" ? "কোনো প্রোডাক্ট পাওয়া যায়নি" : "No products match your filters"}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {lang === "bn" ? "অনুগ্রহ করে ফিল্টারের মান পরিবর্তন করে চেষ্টা করুন।" : "Try adjusting your price range, ratings, or stock filters."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                    {filteredProducts.map((prod) => {
+                      const isWishlisted = wishlist.includes(prod.id);
+                      return (
+                        <ProductCard
+                          key={prod.id}
+                          product={prod}
+                          lang={lang}
+                          onViewDetails={setSelectedProductDetails}
+                          onAddToCart={(p) => handleAddToCart(p, 1)}
+                          onOrderNow={handleOrderNow}
+                          isWishlisted={isWishlisted}
+                          onToggleWishlist={handleToggleWishlist}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3.5">
-                {filteredProducts.map((prod) => (
-                  <ProductCard
-                    key={prod.id}
-                    product={prod}
-                    lang={lang}
-                    onViewDetails={setSelectedProductDetails}
-                    onAddToCart={(p) => handleAddToCart(p, 1)}
-                    onOrderNow={handleOrderNow}
-                  />
-                ))}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -1487,6 +1562,8 @@ export default function App() {
                   onChangeTtPixelId={setTtPixelId}
                   heroImageUrl={heroImageUrl}
                   onChangeHeroImageUrl={setHeroImageUrl}
+                  coupons={coupons}
+                  onUpdateCoupons={setCoupons}
                 />
               </div>
             )}
@@ -1817,12 +1894,35 @@ export default function App() {
                   )}
                 </div>
 
-                {couponCode.toUpperCase() === "FB20" && (
+                {matchedCoupon && cartSubtotal >= matchedCoupon.minPurchase ? (
+                  <p className="text-[11px] text-[#3730a3] font-bold flex items-center gap-1 bg-[#3730a3]/5 border border-[#3730a3]/15 p-2 rounded-lg">
+                    <span>🎉</span>
+                    <span>
+                      {matchedCoupon.code}: {lang === "bn" ? matchedCoupon.descriptionBn : matchedCoupon.descriptionEn}
+                    </span>
+                  </p>
+                ) : couponCode && matchedCoupon && cartSubtotal < matchedCoupon.minPurchase ? (
+                  <p className="text-[11px] text-amber-800 font-bold flex items-center gap-1 bg-amber-50 border border-amber-200 p-2 rounded-lg">
+                    <span>⚠️</span>
+                    <span>
+                      {lang === "bn" 
+                        ? `ন্যূনতম ৳${matchedCoupon.minPurchase} কিনতে হবে (প্রয়োজন আরও ৳${matchedCoupon.minPurchase - cartSubtotal})` 
+                        : `Min spend of ৳${matchedCoupon.minPurchase} required (needs ৳${matchedCoupon.minPurchase - cartSubtotal} more)`}
+                    </span>
+                  </p>
+                ) : couponCode && !matchedCoupon && couponCode.toUpperCase() === "FB20" ? (
                   <p className="text-[11px] text-[#3730a3] font-bold flex items-center gap-1 bg-[#3730a3]/5 border border-[#3730a3]/15 p-2 rounded-lg">
                     <span>🎉</span>
                     {lang === "bn" ? "ফেসবুক অ্যাড স্পেশাল ২০% ডিসকাউন্ট সক্রিয়!" : "FB20: 20% discount successfully applied!"}
                   </p>
-                )}
+                ) : couponCode && !matchedCoupon ? (
+                  <p className="text-[11px] text-red-600 font-bold flex items-center gap-1 bg-red-50 border border-red-100 p-2 rounded-lg">
+                    <span>❌</span>
+                    <span>
+                      {lang === "bn" ? "কুপন কোডটি সঠিক নয়" : "Invalid coupon code"}
+                    </span>
+                  </p>
+                ) : null}
 
                 <div className="space-y-2 text-xs font-medium text-gray-500">
                   <div className="flex justify-between">
@@ -1831,7 +1931,10 @@ export default function App() {
                   </div>
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-[#3730a3]">
-                      <span>{lang === "bn" ? "ডিসকাউন্ট (২০%)" : "Promo discount (20%)"}</span>
+                      <span>
+                        {lang === "bn" ? "ডিসকাউন্ট" : "Promo discount"}{" "}
+                        {matchedCoupon ? `(${matchedCoupon.code})` : "(FB20)"}
+                      </span>
                       <span className="font-bold">-৳{discountAmount}</span>
                     </div>
                   )}

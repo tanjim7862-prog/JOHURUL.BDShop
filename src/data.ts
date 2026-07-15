@@ -6,14 +6,16 @@ export const INITIAL_PRODUCTS: Product[] = [
     name: "Premium Leather Wallet",
     banglaName: "প্রিমিয়াম চামড়ার ওয়ালেট",
     description: "Crafted from 100% genuine top-grain leather. Sleek design with RFID blocking technology, 6 card slots, and an easy-access ID window.",
-    banglaDescription: "১০০% খাঁটি চামড়া দিয়ে তৈরি প্রিমিয়াম ওয়ালেট। এতে আছে আরএফআইডি ব্লকিং প্রযুক্তি, ৬টি কার্ড স্লট এবং একটি সহজে ব্যবহারের উপযোগী আইডি উইন্ডো।",
+    banglaDescription: "১০০% খাঁটি চামড়া দিয়ে তৈরি প্রিমিয়াম ওয়ালেট। এতে আছে আরএফআইডি ব্লকিং প্রযুক্তি, ৩টি কার্ড স্লট এবং একটি সহজে ব্যবহারের উপযোগী আইডি উইন্ডো।",
     price: 1250,
     originalPrice: 1850,
     image: "https://images.unsplash.com/photo-1627124718515-053ef11b7f03?auto=format&fit=crop&q=80&w=600",
     category: "Accessories",
     rating: 4.8,
     reviewsCount: 142,
-    stock: 25
+    stock: 25,
+    badge: "new",
+    salesCount: 280
   },
   {
     id: "2",
@@ -27,7 +29,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Electronics",
     rating: 4.6,
     reviewsCount: 89,
-    stock: 18
+    stock: 18,
+    badge: "hot",
+    isFlashSale: true,
+    flashSalePrice: 2190,
+    salesCount: 450
   },
   {
     id: "3",
@@ -41,7 +47,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Electronics",
     rating: 4.7,
     reviewsCount: 210,
-    stock: 12
+    stock: 12,
+    badge: "sale",
+    isFlashSale: true,
+    flashSalePrice: 2890,
+    salesCount: 520
   },
   {
     id: "4",
@@ -55,7 +65,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Apparel",
     rating: 4.9,
     reviewsCount: 312,
-    stock: 30
+    stock: 30,
+    badge: "hot",
+    salesCount: 190
   },
   {
     id: "5",
@@ -69,7 +81,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Grocery",
     rating: 4.5,
     reviewsCount: 76,
-    stock: 50
+    stock: 50,
+    badge: "new",
+    salesCount: 85
   },
   {
     id: "6",
@@ -83,7 +97,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Accessories",
     rating: 4.7,
     reviewsCount: 95,
-    stock: 22
+    stock: 0, // Out of stock for testing stock filter
+    badge: "sale",
+    salesCount: 150
   },
   {
     id: "7",
@@ -97,7 +113,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Shoes & Footwear",
     rating: 4.9,
     reviewsCount: 156,
-    stock: 14
+    stock: 14,
+    badge: "hot",
+    isFlashSale: true,
+    flashSalePrice: 1690,
+    salesCount: 380
   },
   {
     id: "8",
@@ -111,7 +131,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "Cosmetics & Beauty",
     rating: 4.8,
     reviewsCount: 112,
-    stock: 20
+    stock: 20,
+    badge: "new",
+    salesCount: 110
   }
 ];
 
