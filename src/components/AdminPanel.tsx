@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Product, Order, OrderStatus, Coupon } from "../types";
 import { createDefaultTrackingHistory, updateTrackingHistory } from "../data";
 import watchBannerImg from "../assets/images/watch_banner_1784030925146.jpg";
@@ -7,7 +7,7 @@ import {
   X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2,
   LayoutDashboard, Users, CreditCard, Layers, Feather, BookOpen, Image as ImageIcon,
   Activity, Globe, Truck, MessageSquare, Key, Settings, UserCheck, Menu, ChevronRight,
-  ChevronLeft, Search, FileText, Percent, TrendingDown, ArrowUpRight, Sparkles
+  ChevronLeft, Search, FileText, Percent, TrendingDown, ArrowUpRight, Sparkles, Printer
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -161,6 +161,23 @@ export default function AdminPanel({
   const [isEditingProduct, setIsEditingProduct] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "dead">("all");
+  const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+
+  // Supplier/Shop WhatsApp mappings state
+  const [supplierPhoneMap, setSupplierPhoneMap] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem("mystore_supplier_phones");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const saveSupplierPhone = (shopName: string, phone: string) => {
+    const updated = { ...supplierPhoneMap, [shopName]: phone };
+    setSupplierPhoneMap(updated);
+    localStorage.setItem("mystore_supplier_phones", JSON.stringify(updated));
+  };
 
   // States for Supplier orders sheet export
   const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
@@ -175,6 +192,25 @@ export default function AdminPanel({
   });
   const [isConfigSaved, setIsConfigSaved] = useState<boolean>(false);
   const [isSendingToSheet, setIsSendingToSheet] = useState<boolean>(false);
+  
+  // States for Bulk WhatsApp Dispatches
+  const [waSelectedSupplier, setWaSelectedSupplier] = useState<string>("all");
+  const [waSelectedDate, setWaSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [waPhoneInput, setWaPhoneInput] = useState<string>("");
+
+  useEffect(() => {
+    if (waSelectedSupplier !== "all") {
+      setWaPhoneInput(supplierPhoneMap[waSelectedSupplier] || "");
+    } else {
+      setWaPhoneInput("");
+    }
+  }, [waSelectedSupplier, supplierPhoneMap]);
   
   // Analytics computations
   const totalRevenue = orders
@@ -1192,6 +1228,14 @@ export default function AdminPanel({
           )
         );
 
+        // Calculate counts for advanced status filtering
+        const totalCount = orders.length;
+        const pendingCount = orders.filter(o => o.status === OrderStatus.RECEIVED).length;
+        const processingCount = orders.filter(o => o.status === OrderStatus.PROCESSING).length;
+        const shippedCount = orders.filter(o => o.status === OrderStatus.SHIPPED || o.status === OrderStatus.OUT_FOR_DELIVERY).length;
+        const deliveredCount = orders.filter(o => o.status === OrderStatus.DELIVERED).length;
+        const cancelledCount = orders.filter(o => o.status === OrderStatus.CANCELLED).length;
+
         return (
           <div className="space-y-6 animate-fade-in">
             {/* SUPPLIER EXPORT & SHEET INTEGRATION COMPONENT */}
@@ -1214,7 +1258,7 @@ export default function AdminPanel({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Left Panel: Excel Spreadsheet Download */}
                 <div className="bg-white rounded-2xl border border-indigo-50 p-4 space-y-4 shadow-xs">
                   <div className="flex items-center gap-2 text-indigo-900">
@@ -1289,7 +1333,7 @@ export default function AdminPanel({
                   )}
                 </div>
 
-                {/* Right Panel: Google Sheet Sync Settings */}
+                {/* Middle Panel: Google Sheet Sync Settings */}
                 <div className="bg-white rounded-2xl border border-indigo-50 p-4 space-y-4 shadow-xs flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2 text-indigo-900 mb-3">
@@ -1346,6 +1390,219 @@ export default function AdminPanel({
                     )}
                   </button>
                 </div>
+
+                {/* Right Panel: Bulk Sourcing Slips via WhatsApp */}
+                <div className="bg-white rounded-2xl border border-indigo-50 p-4 space-y-4 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-indigo-900 mb-3">
+                      <span className="text-lg">💬</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                        {lang === "bn" ? "৩. হোয়াটসঅ্যাপে রসিদ ও সামারি ডেসপ্যাচ" : "3. WhatsApp Sourcing Slip Dispatches"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 text-xs font-bold">
+                      {/* Shop Dropdown */}
+                      <div className="space-y-1">
+                        <label className="text-gray-500 block">
+                          {lang === "bn" ? "উৎস শপ / সরবরাহকারী নির্বাচন" : "Select Supplier Shop"}
+                        </label>
+                        <select
+                          id="wa-supplier-select"
+                          value={waSelectedSupplier}
+                          onChange={(e) => setWaSelectedSupplier(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="all">🌐 {lang === "bn" ? "সব শপ / সরবরাহকারী (All)" : "All Suppliers / Shops"}</option>
+                          {uniqueSuppliersList.map((sup) => (
+                            <option key={sup} value={sup}>🏪 {sup}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Date Input with previous option */}
+                      <div className="space-y-1">
+                        <label className="text-gray-500 block">
+                          {lang === "bn" ? "তারিখ নির্বাচন (পূর্ববর্তী তারিখ সিলেক্ট করতে পারবেন)" : "Select Date (Supports Previous Dates)"}
+                        </label>
+                        <input
+                          id="wa-date-picker"
+                          type="date"
+                          value={waSelectedDate}
+                          onChange={(e) => setWaSelectedDate(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-gray-700 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      {/* Phone Input with Save Option */}
+                      <div className="space-y-1">
+                        <label className="text-gray-500 block">
+                          {lang === "bn" ? "সরবরাহকারী হোয়াটসঅ্যাপ নম্বর" : "Supplier WhatsApp Number"}
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            id="wa-phone-input"
+                            type="text"
+                            value={waPhoneInput}
+                            disabled={waSelectedSupplier === "all"}
+                            onChange={(e) => setWaPhoneInput(e.target.value)}
+                            className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder={waSelectedSupplier === "all" ? "শপ সিলেক্ট করুন" : "e.g. 01700000000"}
+                          />
+                          <button
+                            type="button"
+                            disabled={waSelectedSupplier === "all"}
+                            onClick={() => {
+                              if (waSelectedSupplier !== "all") {
+                                saveSupplierPhone(waSelectedSupplier, waPhoneInput);
+                                alert(lang === "bn" ? "ওয়াটসঅ্যাপ নম্বর সফলভাবে সেভ হয়েছে!" : "WhatsApp number successfully saved!");
+                              }
+                            }}
+                            className={`px-4 rounded-xl text-xs font-black transition-all ${
+                              waSelectedSupplier === "all" 
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                                : "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                            }`}
+                          >
+                            {lang === "bn" ? "সেভ" : "Save"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Calculations & Bulk Button */}
+                  {(() => {
+                    // Filter matching orders for the selected supplier & date
+                    const matchingOrders = orders.filter(order => {
+                      // Check date match
+                      const isDateOk = (() => {
+                        if (!order.createdAt) return false;
+                        try {
+                          const orderDate = new Date(order.createdAt);
+                          const y = orderDate.getFullYear();
+                          const m = String(orderDate.getMonth() + 1).padStart(2, '0');
+                          const d = String(orderDate.getDate()).padStart(2, '0');
+                          return `${y}-${m}-${d}` === waSelectedDate;
+                        } catch {
+                          return false;
+                        }
+                      })();
+                      if (!isDateOk) return false;
+
+                      // Check supplier match
+                      if (waSelectedSupplier !== "all") {
+                        return order.cartItems.some(item => {
+                          const prod = products.find(p => p.id === item.product.id) || item.product;
+                          return (prod.supplierShop || "").trim().toLowerCase() === waSelectedSupplier.trim().toLowerCase();
+                        });
+                      }
+                      return true;
+                    });
+
+                    // Count total items
+                    const totalItemsToPack = matchingOrders.reduce((sum, order) => {
+                      const itemsForShop = order.cartItems.filter(item => {
+                        if (waSelectedSupplier === "all") return true;
+                        const prod = products.find(p => p.id === item.product.id) || item.product;
+                        return (prod.supplierShop || "").trim().toLowerCase() === waSelectedSupplier.trim().toLowerCase();
+                      });
+                      return sum + itemsForShop.reduce((iSum, item) => iSum + item.quantity, 0);
+                    }, 0);
+
+                    // Create WhatsApp link logic
+                    const handleWaSend = () => {
+                      if (matchingOrders.length === 0) {
+                        alert(lang === "bn" ? "এই তারিখে এই শপের কোনো রসিদ পাওয়া যায়নি!" : "No order slips found for this shop on this date!");
+                        return;
+                      }
+
+                      let targetPhone = waPhoneInput.trim();
+                      if (waSelectedSupplier === "all") {
+                        alert(lang === "bn" ? "দয়া করে নির্দিষ্ট শপ সিলেক্ট করে ওয়াটসঅ্যাপে পাঠান।" : "Please select a specific shop to send WhatsApp slip.");
+                        return;
+                      }
+
+                      if (!targetPhone) {
+                        alert(lang === "bn" ? "দয়া করে সরবরাহকারীর ওয়াটসঅ্যাপ নম্বর দিন ও সেভ করুন।" : "Please provide and save supplier WhatsApp number first.");
+                        return;
+                      }
+
+                      // Auto prefix 88
+                      if (targetPhone.startsWith("01") && targetPhone.length === 11) {
+                        targetPhone = "88" + targetPhone;
+                      }
+
+                      // Build the massive message
+                      const formattedDate = new Date(waSelectedDate).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
+                        year: 'numeric', month: 'long', day: 'numeric'
+                      });
+
+                      let msgText = lang === "bn"
+                        ? `*📦 সরবরাহ অর্ডার স্লিপ ও সামারি রিপোর্ট*\n*শপ:* ${waSelectedSupplier.toUpperCase()}\n*তারিখ:* ${formattedDate}\n----------------------------------\n*মোট পার্সেল সংখ্যা:* ${matchingOrders.length} টি\n*মোট আইটেম সংখ্যা:* ${totalItemsToPack} টি\n----------------------------------\n\n`
+                        : `*📦 SUPPLIER BATCH REPORT - ${waSelectedSupplier.toUpperCase()}*\n*Date:* ${formattedDate}\n----------------------------------\n*Total Parcels:* ${matchingOrders.length}\n*Total Items to Pack:* ${totalItemsToPack}\n----------------------------------\n\n`;
+
+                      matchingOrders.forEach((order, idx) => {
+                        const itemsForThisShop = order.cartItems.filter(item => {
+                          const prod = products.find(p => p.id === item.product.id) || item.product;
+                          return (prod.supplierShop || "").trim().toLowerCase() === waSelectedSupplier.trim().toLowerCase();
+                        });
+
+                        const itemsDetails = itemsForThisShop.map(item => {
+                          const prod = products.find(p => p.id === item.product.id) || item.product;
+                          const name = lang === "bn" ? prod.banglaName || prod.name : prod.name;
+                          const variant = [
+                            item.selectedSize ? `Size: ${item.selectedSize}` : "",
+                            item.selectedColor ? `Color: ${item.selectedColor}` : ""
+                          ].filter(Boolean).join(", ");
+                          
+                          // Include image url if available so supplier can view image
+                          const imageStr = prod.image ? `\n   🖼️ ছবি: ${prod.image}` : "";
+                          return `• ${name} x${item.quantity} ${variant ? `(${variant})` : ""}${imageStr}`;
+                        }).join("\n");
+
+                        msgText += lang === "bn"
+                          ? `*রসিদ নং ${idx + 1}:* #${order.id}\n👤 নাম: ${order.customerName}\n📞 মোবাইল: ${order.customerPhone}\n📍 ঠিকানা: ${order.customerAddress}\n🏘️ থানা: ${order.customerThana || "N/A"}\n🏙️ জেলা: ${order.customerDistrict}\n🛒 পণ্য বিবরণী:\n${itemsDetails}\n----------------------------------\n\n`
+                          : `*Slip ${idx + 1}:* #${order.id}\n👤 Name: ${order.customerName}\n📞 Phone: ${order.customerPhone}\n📍 Address: ${order.customerAddress}\n🏘️ Thana: ${order.customerThana || "N/A"}\n🏙️ District: ${order.customerDistrict}\n🛒 Items:\n${itemsDetails}\n----------------------------------\n\n`;
+                      });
+
+                      msgText += lang === "bn"
+                        ? `দয়া করে উপরের পণ্যগুলো দ্রুত প্যাকেট করে ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`
+                        : `Please package and prepare these products for delivery. Thank you!`;
+
+                      const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msgText)}`;
+                      window.open(waUrl, "_blank");
+                    };
+
+                    return (
+                      <div className="space-y-3 mt-3">
+                        <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 text-[11px] font-bold text-indigo-950 flex flex-col gap-1">
+                          <div className="flex justify-between">
+                            <span>{lang === "bn" ? "মোট রসিদ / পার্সেল:" : "Total Slip Count:"}</span>
+                            <span className="text-xs font-black text-[#3730a3]">{matchingOrders.length} {lang === "bn" ? "টি" : "parcels"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>{lang === "bn" ? "পণ্য প্যাক সংখ্যা:" : "Total Items to Pack:"}</span>
+                            <span className="text-xs font-black text-[#3730a3]">{totalItemsToPack} {lang === "bn" ? "টি" : "items"}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleWaSend}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>
+                            {lang === "bn" 
+                              ? "১-ক্লিকে হোয়াটসঅ্যাপে সব স্লিপ পাঠান" 
+                              : "Send All Slips to WhatsApp"}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
 
@@ -1363,50 +1620,132 @@ export default function AdminPanel({
                   className="w-full bg-slate-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
                 />
               </div>
-              <div className="flex gap-2 w-full md:w-auto">
-                <select
-                  value={orderStatusFilter}
-                  onChange={(e) => setOrderStatusFilter(e.target.value)}
-                  className="bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="all">{lang === "bn" ? "সব স্ট্যাটাস" : "All Statuses"}</option>
-                  <option value="PENDING">PENDING</option>
-                  <option value="CONFIRMED">CONFIRMED</option>
-                  <option value="PACKED">PACKED</option>
-                  <option value="SHIPPED">SHIPPED</option>
-                  <option value="DELIVERED">DELIVERED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
+              <div className="flex gap-2 w-full md:w-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setOrderSearchQuery("");
                     setOrderStatusFilter("all");
                   }}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer"
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer transition-colors w-full md:w-auto"
                 >
-                  {lang === "bn" ? "রিসেট" : "Reset"}
+                  {lang === "bn" ? "রিসেট করুন" : "Reset Filters"}
                 </button>
               </div>
             </div>
 
+            {/* Advanced Status Filtering Tabs */}
+            <div className="flex bg-slate-50 border border-gray-150 p-1.5 rounded-2xl gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide shadow-xs">
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter("all")}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                  orderStatusFilter === "all"
+                    ? "bg-white text-[#3730a3] shadow-xs border border-gray-100"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/50"
+                }`}
+              >
+                <span>🌐</span> {lang === "bn" ? "সব অর্ডার" : "All Orders"}
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${orderStatusFilter === "all" ? "bg-indigo-100 text-[#3730a3]" : "bg-gray-200 text-gray-600"}`}>
+                  {totalCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter("RECEIVED")}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                  orderStatusFilter === "RECEIVED"
+                    ? "bg-[#3730a3] text-white shadow-xs"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/50"
+                }`}
+              >
+                <span>🕒</span> {lang === "bn" ? "পেন্ডিং অর্ডার" : "Pending"}
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${orderStatusFilter === "RECEIVED" ? "bg-indigo-900/40 text-indigo-100" : "bg-gray-200 text-gray-600"}`}>
+                  {pendingCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter("PROCESSING")}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                  orderStatusFilter === "PROCESSING"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/50"
+                }`}
+              >
+                <span>⚙️</span> {lang === "bn" ? "প্রসেসিং" : "Processing"}
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${orderStatusFilter === "PROCESSING" ? "bg-amber-800/40 text-amber-100" : "bg-gray-200 text-gray-600"}`}>
+                  {processingCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter("SHIPPED")}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                  orderStatusFilter === "SHIPPED"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/50"
+                }`}
+              >
+                <span>🚚</span> {lang === "bn" ? "শিফড / কুরিয়ার" : "Shipped"}
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${orderStatusFilter === "SHIPPED" ? "bg-purple-800/40 text-purple-100" : "bg-gray-200 text-gray-600"}`}>
+                  {shippedCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter("DELIVERED")}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                  orderStatusFilter === "DELIVERED"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/50"
+                }`}
+              >
+                <span>✅</span> {lang === "bn" ? "ডেলিভারড" : "Delivered"}
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${orderStatusFilter === "DELIVERED" ? "bg-emerald-800/40 text-emerald-100" : "bg-gray-200 text-gray-600"}`}>
+                  {deliveredCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter("CANCELLED")}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                  orderStatusFilter === "CANCELLED"
+                    ? "bg-red-600 text-white shadow-xs"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/50"
+                }`}
+              >
+                <span>❌</span> {lang === "bn" ? "বাতিলকৃত" : "Cancelled"}
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${orderStatusFilter === "CANCELLED" ? "bg-red-800/40 text-red-100" : "bg-gray-200 text-gray-600"}`}>
+                  {cancelledCount}
+                </span>
+              </button>
+            </div>
+
             {/* Standard Orders list wrapper */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4 overflow-hidden">
               <div className="flex justify-between items-center pb-4 border-b border-gray-100">
                 <div className="space-y-0.5">
-                  <h3 className="text-base font-bold text-gray-800">
-                    {lang === "bn" ? "গ্রাহক অর্ডারের তালিকা" : "Manage Store Shipments"}
+                  <h3 className="text-base font-bold text-gray-800 uppercase tracking-wider">
+                    {lang === "bn" ? "গ্রাহক অর্ডারের তালিকা (উন্নত সংস্করণ)" : "Order List & Manifest System"}
                   </h3>
-                  <p className="text-[10px] text-gray-400">
-                    {selectedSupplier !== "all" && (
+                  <p className="text-[10px] text-gray-400 font-semibold">
+                    {selectedSupplier !== "all" ? (
                       <span className="text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-md">
                         🏪 {lang === "bn" ? `${selectedSupplier} এর প্রোডাক্টের অর্ডারসমূহ ফিল্টার করা` : `Showing products sourced from ${selectedSupplier}`}
                       </span>
+                    ) : (
+                      lang === "bn" ? "সরাসরি অর্ডার প্রিন্ট করুন এবং স্ট্যাটাস ট্র্যাক ও আপডেট করুন এক ক্লিকে।" : "Generate order slips, track cash collectables, and print delivery labels."
                     )}
                   </p>
                 </div>
-                <span className="text-xs text-gray-400 font-semibold">
-                  {lang === "bn" ? `সর্বমোট ${orders.length} টি অর্ডার` : `Total ${orders.length} orders recorded`}
+                <span className="text-xs text-[#3730a3] bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl font-extrabold">
+                  {lang === "bn" ? `মোট ${orders.length} টি অর্ডার` : `Total ${orders.length} orders`}
                 </span>
               </div>
 
@@ -1434,86 +1773,188 @@ export default function AdminPanel({
 
                 // Filter by Status
                 if (orderStatusFilter !== "all") {
-                  displayedOrders = displayedOrders.filter(order => order.status === orderStatusFilter);
+                  displayedOrders = displayedOrders.filter(order => {
+                    if (orderStatusFilter === "RECEIVED") return order.status === OrderStatus.RECEIVED;
+                    if (orderStatusFilter === "PROCESSING") return order.status === OrderStatus.PROCESSING;
+                    if (orderStatusFilter === "SHIPPED") return order.status === OrderStatus.SHIPPED || order.status === OrderStatus.OUT_FOR_DELIVERY;
+                    if (orderStatusFilter === "DELIVERED") return order.status === OrderStatus.DELIVERED;
+                    if (orderStatusFilter === "CANCELLED") return order.status === OrderStatus.CANCELLED;
+                    return order.status === orderStatusFilter;
+                  });
                 }
 
                 if (displayedOrders.length === 0) {
                   return (
-                    <div className="text-center py-12 text-gray-400 text-sm">
-                      {lang === "bn" ? "এই শপের জন্য কোনো অর্ডার পাওয়া যায়নি।" : "No client invoices found for this supplier filter."}
+                    <div className="text-center py-16 text-gray-400 text-xs font-bold space-y-2">
+                      <ShoppingBag className="w-8 h-8 mx-auto text-gray-300 animate-bounce" />
+                      <p>{lang === "bn" ? "এই ফিল্টারে কোনো অর্ডার পাওয়া যায়নি।" : "No orders found matching this status / query."}</p>
                     </div>
                   );
                 }
 
                 return (
-                  <div className="divide-y divide-gray-100">
-                    {displayedOrders.map((order) => (
-                      <div key={order.id} className="py-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                        <div className="space-y-1 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold bg-gray-100 text-gray-800 px-2.5 py-0.5 rounded">
-                              ID: {order.id}
-                            </span>
-                            {order.fbCampaignRef && (
-                              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
-                                Facebook Campaign
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="font-bold text-gray-900 text-sm">{order.customerName} — {order.customerPhone}</h4>
-                          <p className="text-xs text-gray-500">
-                            📍 {order.customerAddress}, {order.customerThana ? `${order.customerThana}, ` : ""}{order.customerDistrict}{order.customerDivision ? `, ${order.customerDivision}` : ""}
-                          </p>
-                          {/* Cart summary */}
-                          <div className="flex flex-wrap gap-1.5 items-center mt-1">
-                            <span className="text-xs text-gray-400 mr-1">📦 items:</span>
-                            {order.cartItems.map((item, idx) => {
-                              const prod = products.find(p => p.id === item.product.id) || item.product;
-                              return (
-                                <span key={idx} className="inline-flex items-center gap-1 bg-gray-50 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-gray-100">
-                                  {item.product.name} (x{item.quantity})
-                                  {prod.supplierShop && (
-                                    <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100/50 rounded px-1.5">
-                                      🏪 {prod.supplierShop}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-150 text-gray-400 font-extrabold uppercase text-[10px] tracking-wider pb-2">
+                          <th className="pb-3 pt-1 pl-1">{lang === "bn" ? "অর্ডার আইডি ও তারিখ" : "Order ID & Date"}</th>
+                          <th className="pb-3 pt-1">{lang === "bn" ? "গ্রাহকের বিবরণ" : "Customer Details"}</th>
+                          <th className="pb-3 pt-1">{lang === "bn" ? "পণ্য ও কার্ট বিবরণ" : "Purchased Items"}</th>
+                          <th className="pb-3 pt-1 text-right">{lang === "bn" ? "মোট টাকা" : "COD Amount"}</th>
+                          <th className="pb-3 pt-1 text-center">{lang === "bn" ? "স্ট্যাটাস পরিবর্তন" : "Supply Status"}</th>
+                          <th className="pb-3 pt-1 text-center">{lang === "bn" ? "উৎস" : "Source"}</th>
+                          <th className="pb-3 pt-1 text-right pr-1">{lang === "bn" ? "ইনভয়েস" : "Print Label"}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                        {displayedOrders.map((order) => {
+                          const orderDate = new Date(order.createdAt);
+                          const formattedDate = orderDate.toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          });
+                          const formattedTime = orderDate.toLocaleTimeString(lang === "bn" ? 'bn-BD' : 'en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          });
+
+                          return (
+                            <tr key={order.id} className="hover:bg-slate-50/40 transition-colors">
+                              <td className="py-4 pl-1 space-y-1">
+                                <span className="font-mono text-[11px] font-black bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                                  #{order.id}
+                                </span>
+                                <div className="text-[10px] text-gray-400 font-bold block">
+                                  📅 {formattedDate}
+                                  <span className="text-gray-300 mx-1">•</span>
+                                  {formattedTime}
+                                </div>
+                              </td>
+
+                              <td className="py-4 max-w-[200px]">
+                                <h4 className="font-bold text-gray-950 text-xs">{order.customerName}</h4>
+                                <p className="font-mono text-[11px] text-[#3730a3] font-bold mt-0.5">{order.customerPhone}</p>
+                                <p className="text-[10px] text-gray-500 line-clamp-2 mt-0.5 leading-relaxed" title={order.customerAddress}>
+                                  📍 {order.customerAddress}
+                                </p>
+                                <div className="flex gap-1 items-center mt-1 flex-wrap">
+                                  <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-50 text-[#3730a3] border border-indigo-100 px-1.5 py-0.2 rounded">
+                                    {order.customerDistrict}
+                                  </span>
+                                  {order.customerThana && (
+                                    <span className="text-[8px] font-bold uppercase bg-slate-100 text-gray-600 px-1.5 py-0.2 rounded">
+                                      {order.customerThana}
                                     </span>
                                   )}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
+                                </div>
+                              </td>
 
-                        <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
-                          <div className="text-left lg:text-right">
-                            <span className="text-xs text-gray-400 block">{lang === "bn" ? "মোট সংগ্রহ" : "COD Amount"}</span>
-                            <span className="text-indigo-900 font-bold text-gray-800">৳{order.totalAmount}</span>
-                          </div>
+                              <td className="py-4 space-y-1.5 max-w-[240px]">
+                                {order.cartItems.map((item, idx) => {
+                                  const prod = products.find(p => p.id === item.product.id) || item.product;
+                                  return (
+                                    <div key={idx} className="flex flex-col gap-0.5 bg-slate-50 border border-slate-100 p-1.5 rounded-lg">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <span className="text-[10px] font-black text-gray-800 line-clamp-1 leading-normal">
+                                          {lang === "bn" ? prod.banglaName || prod.name : prod.name}
+                                        </span>
+                                        <span className="text-[9px] font-black font-mono text-gray-500 bg-white border px-1 rounded">
+                                          x{item.quantity}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[9px] font-mono font-bold text-indigo-600">
+                                          ৳{item.price || prod.price}
+                                        </span>
+                                        {item.selectedSize && (
+                                          <span className="text-[8px] font-extrabold uppercase bg-white border border-gray-150 text-gray-500 px-1 rounded">
+                                            Size: {item.selectedSize}
+                                          </span>
+                                        )}
+                                        {item.selectedColor && (
+                                          <span className="text-[8px] font-extrabold uppercase bg-white border border-gray-150 text-gray-500 px-1 rounded">
+                                            Color: {item.selectedColor}
+                                          </span>
+                                        )}
+                                        {prod.supplierShop && (
+                                          <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1 rounded ml-auto">
+                                            🏪 {prod.supplierShop}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </td>
 
-                          {/* Status Select dropdown */}
-                          <div className="flex items-center gap-2">
-                            <select
-                              id={`status-select-${order.id}`}
-                              value={order.status}
-                              onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
-                              className={`text-xs font-bold rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 ${
-                                order.status === OrderStatus.DELIVERED
-                                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                                  : order.status === OrderStatus.CANCELLED
-                                  ? "bg-red-50 border-red-200 text-red-700"
-                                  : "bg-amber-50 border-amber-200 text-amber-700"
-                              }`}
-                            >
-                              <option value={OrderStatus.RECEIVED}>Order Received</option>
-                              <option value={OrderStatus.PROCESSING}>Processing</option>
-                              <option value={OrderStatus.SHIPPED}>Shipped</option>
-                              <option value={OrderStatus.OUT_FOR_DELIVERY}>Out for Delivery</option>
-                              <option value={OrderStatus.DELIVERED}>Delivered</option>
-                              <option value={OrderStatus.CANCELLED}>Cancelled</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                              <td className="py-4 text-right">
+                                <div className="space-y-0.5">
+                                  <span className="text-xs font-black text-slate-900 font-mono">৳{order.totalAmount}</span>
+                                  <span className={`block text-[9px] font-black uppercase tracking-wider text-right ${
+                                    order.paymentMethod === "cod" ? "text-amber-600" : "text-emerald-600"
+                                  }`}>
+                                    {order.paymentMethod === "cod" ? "C.O.D" : order.paymentMethod === "online" ? "Online" : "Paid"}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-4 text-center">
+                                <div className="inline-block">
+                                  <select
+                                    id={`status-select-${order.id}`}
+                                    value={order.status}
+                                    onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                                    className={`text-[10px] font-black rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-[#3730a3] cursor-pointer transition-all ${
+                                      order.status === OrderStatus.DELIVERED
+                                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                        : order.status === OrderStatus.CANCELLED
+                                        ? "bg-red-50 border-red-200 text-red-700"
+                                        : order.status === OrderStatus.SHIPPED || order.status === OrderStatus.OUT_FOR_DELIVERY
+                                        ? "bg-purple-50 border-purple-200 text-purple-700"
+                                        : order.status === OrderStatus.PROCESSING
+                                        ? "bg-amber-50 border-amber-200 text-amber-700"
+                                        : "bg-slate-50 border-slate-200 text-slate-700"
+                                    }`}
+                                  >
+                                    <option value={OrderStatus.RECEIVED}>🕒 Order Received (Pending)</option>
+                                    <option value={OrderStatus.PROCESSING}>⚙️ Processing</option>
+                                    <option value={OrderStatus.SHIPPED}>🚚 Shipped</option>
+                                    <option value={OrderStatus.OUT_FOR_DELIVERY}>🛵 Out for Delivery</option>
+                                    <option value={OrderStatus.DELIVERED}>✅ Delivered</option>
+                                    <option value={OrderStatus.CANCELLED}>❌ Cancelled</option>
+                                  </select>
+                                </div>
+                              </td>
+
+                              <td className="py-4 text-center">
+                                {order.fbCampaignRef ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase" title={`FB Campaign: ${order.fbCampaignRef}`}>
+                                    <span>🔵</span> FB Ads
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                                    Organic
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="py-4 text-right pr-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setPrintingOrder(order)}
+                                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 text-[10px] font-black py-2 px-3 rounded-xl border border-emerald-100 transition-all inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                                  title={lang === "bn" ? "অর্ডার স্লিপ / ইনভয়েস প্রিন্ট" : "Generate Printable Invoice"}
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>{lang === "bn" ? "রসিদ" : "Slip"}</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}
@@ -4058,6 +4499,381 @@ export default function AdminPanel({
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRINTABLE ORDER SLIP / INVOICE GENERATION OVERLAY MODAL */}
+      {printingOrder && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 print:p-0 print:bg-white print:absolute print:inset-0">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 shadow-xl border border-gray-100 flex flex-col gap-4 print:shadow-none print:border-none print:p-0 print:max-w-none">
+            
+            {/* Modal Actions Header (Explicitly hidden during media printing) */}
+            <div className="flex justify-between items-center pb-3 border-b border-gray-150 print:hidden">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🧾</span>
+                <h3 className="font-extrabold text-sm text-gray-850">
+                  {lang === "bn" ? "অর্ডার স্লিপ ও ইনভয়েস জেনারেশন" : "Order Slip & Invoice Generation"}
+                </h3>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Printer className="w-4 h-4" />
+                  {lang === "bn" ? "প্রিন্ট / পিডিএফ সেভ করুন" : "Print / Save PDF"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintingOrder(null)}
+                  className="bg-slate-100 hover:bg-slate-200 text-gray-500 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                  {lang === "bn" ? "বন্ধ করুন" : "Close"}
+                </button>
+              </div>
+            </div>
+
+            {/* Split Screen Layout on UI, but completely simplified on media print */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              
+              {/* Left Column: Printable Area (Occupies full 100% space during print) */}
+              <div className="lg:col-span-7 bg-white print:col-span-12">
+                <div 
+                  id="printable-invoice-area" 
+                  className="bg-white text-gray-800 p-4 font-sans leading-relaxed text-xs space-y-4 print:p-0"
+                >
+                  {/* Media print style overrides to suppress background elements and show ONLY the invoice */}
+                  <style dangerouslySetInnerHTML={{__html: `
+                    @media print {
+                      body {
+                        background-color: white !important;
+                        color: black !important;
+                      }
+                      /* Hide entire root application */
+                      body > * {
+                        display: none !important;
+                      }
+                      /* Force display only the printable invoice wrapper */
+                      #printable-invoice-area {
+                        display: block !important;
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        padding: 30px !important;
+                        margin: 0 !important;
+                        visibility: visible !important;
+                      }
+                      #printable-invoice-area * {
+                        visibility: visible !important;
+                      }
+                    }
+                  `}} />
+
+                  {/* Invoice Brand Header */}
+                  <div className="flex justify-between items-start border-b-2 border-gray-900 pb-4">
+                    <div className="space-y-1">
+                      <h1 className="text-xl font-black text-indigo-950 uppercase tracking-tight">Johurul BDShop</h1>
+                      <p className="text-[10px] text-gray-500 font-semibold">Premium E-Commerce Shopping Hub</p>
+                      <p className="text-[10px] text-gray-500">Dhaka, Bangladesh | Phone: +880 1795-339373</p>
+                      <p className="text-[10px] text-gray-500">Email: support@johurulbdshop.com</p>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div className="bg-slate-100 px-3 py-1.5 rounded-xl inline-block print:bg-gray-100 print:border border-gray-200">
+                        <span className="text-[9px] font-extrabold text-gray-500 uppercase tracking-wider block">INVOICE NO</span>
+                        <span className="font-mono text-xs font-black text-gray-900">#{printingOrder.id}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        Date: <span className="font-bold">{new Date(printingOrder.createdAt).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </p>
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 uppercase mt-1 print:border print:text-black">
+                        {printingOrder.paymentMethod === "cod" ? "Cash On Delivery (COD)" : `Online Pay (${printingOrder.onlineGatewayType || "Digital"})`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Billing Info Panel */}
+                  <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-2xl print:bg-gray-50 print:border border-gray-200">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider block">CUSTOMER DETAILS / বিলিং তথ্য</span>
+                      <p className="font-black text-sm text-gray-900">{printingOrder.customerName}</p>
+                      <p className="font-mono font-bold text-[#3730a3] text-xs print:text-black">📞 {printingOrder.customerPhone}</p>
+                      <p className="text-[10px] text-gray-600">
+                        📍 {printingOrder.customerAddress}
+                      </p>
+                      <p className="text-[10px] text-gray-500 font-semibold">
+                        {printingOrder.customerThana ? `${printingOrder.customerThana}, ` : ""}{printingOrder.customerDistrict}, {printingOrder.customerDivision || ""}
+                      </p>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider block">SHIPMENT LOGISTICS</span>
+                      <p className="text-[10px] font-bold text-gray-700">Delivery Status: <span className="text-indigo-800 uppercase font-black">{printingOrder.status}</span></p>
+                      <p className="text-[10px] text-gray-500">Courier Provider: {deliveryConfig.provider}</p>
+                      {printingOrder.fbCampaignRef && (
+                        <p className="text-[9px] text-indigo-700 font-bold bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100 mt-1">
+                          Source: FB Campaign - {printingOrder.fbCampaignRef}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Itemized Table */}
+                  <div className="space-y-1.5">
+                    <h4 className="font-black text-[9px] uppercase text-gray-400 tracking-wider">ORDERED ITEMS / কার্ট পণ্যসমূহ</h4>
+                    <table className="w-full text-left text-[10px] border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-gray-300 bg-slate-100 font-extrabold text-gray-700 print:bg-gray-100">
+                          <th className="p-2 w-12 text-center">SL</th>
+                          <th className="p-2">{lang === "bn" ? "পণ্য বিবরণী" : "Item Description"}</th>
+                          <th className="p-2 w-24 text-center">{lang === "bn" ? "ভেরিয়েন্ট" : "Variant"}</th>
+                          <th className="p-2 w-24 text-right">{lang === "bn" ? "একক মূল্য" : "Unit Price"}</th>
+                          <th className="p-2 w-16 text-center">{lang === "bn" ? "পরিমাণ" : "Qty"}</th>
+                          <th className="p-2 w-24 text-right">{lang === "bn" ? "মোট" : "Total"}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {printingOrder.cartItems.map((item, idx) => {
+                          const itemPrice = item.price || item.product.price;
+                          const itemTotal = itemPrice * item.quantity;
+                          const prod = products.find(p => p.id === item.product.id) || item.product;
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/40">
+                              <td className="p-2 text-center font-mono text-gray-400">{idx + 1}</td>
+                              <td className="p-2 font-bold text-gray-900">
+                                <div className="flex items-center gap-3">
+                                  {prod.image && (
+                                    <img 
+                                      src={prod.image} 
+                                      alt={prod.name} 
+                                      className="w-12 h-12 rounded-lg object-cover border border-gray-150 shrink-0 print:w-14 print:h-14 print:border"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  )}
+                                  <div className="space-y-0.5">
+                                    <span className="block text-xs font-extrabold text-gray-950 leading-tight">
+                                      {lang === "bn" ? prod.banglaName || prod.name : prod.name}
+                                    </span>
+                                    {prod.supplierShop && (
+                                      <span className="inline-block text-[8px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-100 uppercase">
+                                        🏪 {prod.supplierShop}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-2 text-center text-gray-600">
+                                {item.selectedSize || item.selectedColor ? (
+                                  <div className="flex flex-col gap-0.5 items-center">
+                                    {item.selectedSize && <span className="bg-gray-100 px-1.5 py-0.2 rounded text-[8px] font-extrabold">Size: {item.selectedSize}</span>}
+                                    {item.selectedColor && <span className="bg-gray-100 px-1.5 py-0.2 rounded text-[8px] font-extrabold">Color: {item.selectedColor}</span>}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="p-2 text-right font-mono text-gray-700">৳{itemPrice}</td>
+                              <td className="p-2 text-center font-mono font-bold text-gray-900">{item.quantity}</td>
+                              <td className="p-2 text-right font-mono font-bold text-gray-900">৳{itemTotal}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Summary Calculations Panel */}
+                  {(() => {
+                    const itemsSubtotal = printingOrder.cartItems.reduce((sum, item) => sum + ((item.price || item.product.price) * item.quantity), 0);
+                    const isInsideDhaka = printingOrder.customerDistrict.toLowerCase() === "dhaka" || printingOrder.customerDistrict.toLowerCase().includes("ঢাকা");
+                    const shippingFee = isInsideDhaka ? deliveryConfig.insideDhaka : deliveryConfig.outsideDhaka;
+                    const calculatedDiscount = Math.max(0, itemsSubtotal + shippingFee - printingOrder.totalAmount);
+                    return (
+                      <div className="flex justify-end pt-3">
+                        <div className="w-64 space-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-250 pt-3">
+                          <div className="flex justify-between">
+                            <span>Cart Subtotal (পণ্য মূল্য):</span>
+                            <span className="font-mono text-gray-850">৳{itemsSubtotal}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Shipping Cost (ডেলিভারি চার্জ):</span>
+                            <span className="font-mono text-gray-850">৳{shippingFee}</span>
+                          </div>
+                          {calculatedDiscount > 0 && (
+                            <div className="flex justify-between text-red-600 font-extrabold">
+                              <span>Discount / Coupon (ছাড়):</span>
+                              <span className="font-mono">-৳{calculatedDiscount}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-xs font-black text-indigo-950 border-t-2 border-dashed border-gray-300 pt-2 pb-1 print:text-black">
+                            <span>Total COD Collectable (সর্বমোট বিল):</span>
+                            <span className="font-mono text-sm text-indigo-900 print:text-black">৳{printingOrder.totalAmount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Delivery Disclaimer & Signatures */}
+                  <div className="pt-12 space-y-8">
+                    <div className="flex justify-between text-[9px] font-extrabold text-gray-400 px-6">
+                      <div className="text-center w-36 border-t border-dashed border-gray-300 pt-1.5">
+                        Customer Signature
+                      </div>
+                      <div className="text-center w-36 border-t border-dashed border-gray-300 pt-1.5">
+                        Authorized Signature
+                      </div>
+                    </div>
+                    
+                    <div className="text-center border-t border-gray-150 pt-4 text-[9px] text-gray-400 space-y-0.5 leading-normal">
+                      <p className="font-bold text-gray-500">Thank you for your order with Johurul BDShop!</p>
+                      <p>Please double-check the product parcel with the delivery rider present.</p>
+                      <p className="font-mono text-[8px] text-gray-300">Generated automatically via Store Management Dashboard</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Sourcing & WhatsApp Dispatch Control Box (Hidden on Print) */}
+              <div className="lg:col-span-5 bg-slate-50 rounded-2xl p-5 border border-gray-150 space-y-4 print:hidden">
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-sm text-gray-800 flex items-center gap-1.5">
+                    <span>🏪</span> {lang === "bn" ? "শপভিত্তিক সরবরাহ ও ওয়াটসঅ্যাপ" : "Supplier Sourcing & WhatsApp"}
+                  </h4>
+                  <p className="text-[10px] text-gray-500 leading-relaxed font-semibold">
+                    {lang === "bn" ? "পণ্য সরবরাহকারী শপের মোবাইল নম্বর সেভ করে ১-ক্লিকে ওয়াটসঅ্যাপে স্লিপ পাঠান।" : "Save supplier WhatsApp contact numbers and dispatch individual order slips with one click."}
+                  </p>
+                </div>
+
+                {(() => {
+                  // Get all unique shops/suppliers in this order
+                  const orderSupplierShops = Array.from(
+                    new Set(
+                      printingOrder.cartItems.map(item => {
+                        const prod = products.find(p => p.id === item.product.id) || item.product;
+                        return prod.supplierShop || "Default Shop";
+                      })
+                    )
+                  ).filter(Boolean) as string[];
+
+                  if (orderSupplierShops.length === 0) {
+                    return (
+                      <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-200 text-xs text-gray-400">
+                        {lang === "bn" ? "কোনো সরবরাহকারী শপ ডিফাইন করা নেই।" : "No supplier shops defined for these products."}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {orderSupplierShops.map((shopName) => {
+                        const itemsForThisShop = printingOrder.cartItems.filter(item => {
+                          const prod = products.find(p => p.id === item.product.id) || item.product;
+                          return (prod.supplierShop || "Default Shop") === shopName;
+                        });
+
+                        const currentSavedPhone = supplierPhoneMap[shopName] || "";
+                        // Auto-add country code 880 for BD numbers starting with 01
+                        let formattedPhoneForWa = currentSavedPhone.trim();
+                        if (formattedPhoneForWa.startsWith("01") && formattedPhoneForWa.length === 11) {
+                          formattedPhoneForWa = "88" + formattedPhoneForWa;
+                        }
+
+                        // Formulate WhatsApp API url
+                        const waText = (() => {
+                          const itemsSummary = itemsForThisShop.map(item => {
+                            const prod = products.find(p => p.id === item.product.id) || item.product;
+                            const name = lang === "bn" ? prod.banglaName || prod.name : prod.name;
+                            const variantDetails = [
+                              item.selectedSize ? `Size: ${item.selectedSize}` : "",
+                              item.selectedColor ? `Color: ${item.selectedColor}` : ""
+                            ].filter(Boolean).join(", ");
+                            return `• ${name} x${item.quantity} ${variantDetails ? `(${variantDetails})` : ""}`;
+                          }).join("\n");
+
+                          const orderDate = new Date(printingOrder.createdAt).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
+                            year: 'numeric', month: 'short', day: 'numeric'
+                          });
+
+                          return lang === "bn" 
+                            ? encodeURIComponent(`*📦 সরবরাহ অর্ডার স্লিপ - ${shopName.toUpperCase()}*\n\n*অর্ডার আইডি:* #${printingOrder.id}\n*তারিখ:* ${orderDate}\n\n*গ্রাহকের বিবরণ:*\n- নাম: ${printingOrder.customerName}\n- মোবাইল: ${printingOrder.customerPhone}\n- ঠিকানা: ${printingOrder.customerAddress}\n- থানা: ${printingOrder.customerThana || "N/A"}\n- জেলা: ${printingOrder.customerDistrict}\n\n*পণ্য বিবরণী:*\n${itemsSummary}\n\nদয়া করে পার্সেলটি প্যাকেট করে দ্রুত ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`)
+                            : encodeURIComponent(`*📦 NEW ORDER DISPATCH REQUEST - ${shopName.toUpperCase()}*\n\n*Order ID:* #${printingOrder.id}\n*Date:* ${orderDate}\n\n*Customer Details:*\n- Name: ${printingOrder.customerName}\n- Phone: ${printingOrder.customerPhone}\n- Address: ${printingOrder.customerAddress}\n- Thana: ${printingOrder.customerThana || "N/A"}\n- District: ${printingOrder.customerDistrict}\n\n*Ordered Items:*\n${itemsSummary}\n\nPlease package and prepare these products for delivery. Thank you!`);
+                        })();
+
+                        const waLink = `https://api.whatsapp.com/send?phone=${formattedPhoneForWa}&text=${waText}`;
+
+                        return (
+                          <div key={shopName} className="bg-white border border-gray-150 rounded-2xl p-4 space-y-3 shadow-xs">
+                            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                              <span className="font-extrabold text-xs text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg">
+                                🏪 {shopName}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-400">
+                                {itemsForThisShop.length} {lang === "bn" ? "টি পণ্য" : "items"}
+                              </span>
+                            </div>
+
+                            {/* Sourced Items list */}
+                            <div className="space-y-1.5">
+                              {itemsForThisShop.map((item, idx) => {
+                                const prod = products.find(p => p.id === item.product.id) || item.product;
+                                return (
+                                  <div key={idx} className="flex gap-2 items-center text-[10px] font-semibold text-gray-600 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                                    {prod.image && (
+                                      <img src={prod.image} className="w-6 h-6 rounded object-cover" />
+                                    )}
+                                    <span className="truncate flex-1">{lang === "bn" ? prod.banglaName || prod.name : prod.name}</span>
+                                    <span className="font-mono bg-white border px-1 rounded text-gray-800">x{item.quantity}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Contact configuration */}
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black uppercase text-gray-400 block tracking-wider">
+                                {lang === "bn" ? "ওয়াটসঅ্যাপ নম্বর দিন" : "WhatsApp Number"}
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 8801700000000"
+                                value={currentSavedPhone}
+                                onChange={(e) => saveSupplierPhone(shopName, e.target.value)}
+                                className="w-full bg-slate-50 border border-gray-250 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                              />
+                            </div>
+
+                            {/* WhatsApp Button */}
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`w-full py-2 px-4 rounded-xl font-extrabold text-xs text-white transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                                formattedPhoneForWa 
+                                  ? "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md cursor-pointer" 
+                                  : "bg-gray-300 pointer-events-none cursor-not-allowed"
+                              }`}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span>{lang === "bn" ? "১-ক্লিকে ওয়াটসঅ্যাপে পাঠান" : "Send slip on WhatsApp"}</span>
+                            </a>
+                            {!formattedPhoneForWa && (
+                              <p className="text-[9px] text-red-500 text-center font-bold">
+                                ⚠️ {lang === "bn" ? "ওয়াটসঅ্যাপ বাটন চালু করতে নম্বরটি দিন" : "Enter WhatsApp number to enable button"}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+            </div>
+
           </div>
         </div>
       )}

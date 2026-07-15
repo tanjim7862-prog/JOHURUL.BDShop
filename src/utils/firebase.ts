@@ -55,12 +55,41 @@ export async function getProductsFromFirebase(): Promise<Product[]> {
 }
 
 /**
+ * Recursively removes all undefined fields from an object to prevent Firestore serialization errors.
+ */
+function removeUndefinedFields<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedFields(item)) as unknown as T;
+  }
+  
+  if (typeof obj === "object") {
+    const newObj = {} as any;
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          newObj[key] = removeUndefinedFields(val);
+        }
+      }
+    }
+    return newObj as T;
+  }
+  
+  return obj;
+}
+
+/**
  * Save or update a product in Firestore
  */
 export async function saveProductToFirebase(product: Product): Promise<void> {
   try {
     const productRef = doc(db, PRODUCTS_COLL, product.id);
-    await setDoc(productRef, product);
+    const cleanedProduct = removeUndefinedFields(product);
+    await setDoc(productRef, cleanedProduct);
   } catch (error) {
     console.error(`Error saving product ${product.id} to Firestore:`, error);
     throw error;
@@ -104,7 +133,8 @@ export async function getOrdersFromFirebase(): Promise<Order[]> {
 export async function saveOrderToFirebase(order: Order): Promise<void> {
   try {
     const orderRef = doc(db, ORDERS_COLL, order.id);
-    await setDoc(orderRef, order);
+    const cleanedOrder = removeUndefinedFields(order);
+    await setDoc(orderRef, cleanedOrder);
   } catch (error) {
     console.error(`Error saving order ${order.id} to Firestore:`, error);
     throw error;
@@ -117,7 +147,8 @@ export async function saveOrderToFirebase(order: Order): Promise<void> {
 export async function updateOrderInFirebase(orderId: string, updates: Partial<Order>): Promise<void> {
   try {
     const orderRef = doc(db, ORDERS_COLL, orderId);
-    await updateDoc(orderRef, updates as any);
+    const cleanedUpdates = removeUndefinedFields(updates);
+    await updateDoc(orderRef, cleanedUpdates as any);
   } catch (error) {
     console.error(`Error updating order ${orderId} in Firestore:`, error);
     throw error;
