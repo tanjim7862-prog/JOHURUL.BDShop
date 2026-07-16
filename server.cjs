@@ -51,11 +51,29 @@ if (apiKey && apiKey !== "MY_GEMINI_API_KEY") {
   console.log("GEMINI_API_KEY not found or is placeholder. Using fallback simulation for ad copy.");
 }
 app.post("/api/marketing/ad-copy", async (req, res) => {
-  const { productName, description, price, category, language = "bengali" } = req.body;
+  const { productName, description, price, category, language = "bengali", platform = "facebook", style = "ugc_hook" } = req.body;
   if (!productName) {
     return res.status(400).json({ error: "Product name is required" });
   }
-  const prompt = `You are an expert social media advertiser specializing in Bangladeshi e-commerce and Facebook ad campaigns.
+  let prompt = "";
+  if (platform === "tiktok") {
+    prompt = `You are an expert TikTok advertiser and viral video creator specializing in Bangladeshi e-commerce.
+Create a highly engaging TikTok video script and ad caption for the following product:
+- Name: ${productName}
+- Category: ${category || "General"}
+- Price: ${price ? price + " Taka" : "Varies"}
+- Description: ${description || "High quality product"}
+- TikTok Ad Style: ${style} (e.g., ugc_hook, problem_solution, asmr_unboxing, direct_promo)
+
+Format the response exactly with these sections (using appropriate emojis):
+1. [Video Concept] A description of the visual theme/idea of the TikTok video (e.g. trending UGC hook, unboxing, pain point).
+2. [Video Script & Voiceover] A chronological script with timing markers (e.g. 0:00-0:03 [Visual Description] - Voiceover line, 0:03-0:12, 0:12-0:15) written in an engaging, natural tone (using ${language === "bengali" ? "Bangla/Bengali" : "English"}).
+3. [On-Screen Captions] Dynamic, short text prompts to overlay on the TikTok video.
+4. [TikTok Post Caption & Hashtags] A viral, punchy post caption under 150 characters with trending hashtags (e.g., #tiktokmademebuyit, #bangladesh, #viral).
+
+Ensure the voiceover sounds like a real, enthusiastic customer or creator (UGC style) from Bangladesh.`;
+  } else {
+    prompt = `You are an expert social media advertiser specializing in Bangladeshi e-commerce and Facebook ad campaigns.
 Create a highly engaging, high-conversion Facebook post / ad copy for the following product:
 - Name: ${productName}
 - Category: ${category || "General"}
@@ -69,6 +87,7 @@ Format the response exactly with these sections (using appropriate emoji accents
 4. [Call To Action] A strong call to action directing them to buy with Cash on Delivery and Order Tracking available. Include placeholders like [Link Here] or [Order Now].
 
 Ensure the style is extremely professional, friendly, and culturally relevant to Bangladeshi online shoppers (e.g., mention "\u0986\u099C\u0987 \u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u0995\u09B0\u09C1\u09A8", "\u09B8\u09BE\u09B0\u09BE \u09AC\u09BE\u0982\u09B2\u09BE\u09A6\u09C7\u09B6\u09C7 \u0995\u09CD\u09AF\u09BE\u09B6 \u0985\u09A8 \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF", "\u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u099F\u09CD\u09B0\u09CD\u09AF\u09BE\u0995\u09BF\u0982 \u09B8\u09C1\u09AC\u09BF\u09A7\u09BE").`;
+  }
   if (ai) {
     try {
       const response = await ai.models.generateContent({
@@ -81,19 +100,86 @@ Ensure the style is extremely professional, friendly, and culturally relevant to
       console.error("Gemini API error:", error);
       return res.status(500).json({
         error: "Failed to generate copy using Gemini. Here is a simulated fallback.",
-        fallback: generateSimulatedCopy(productName, price, language)
+        fallback: generateSimulatedCopy(productName, price, language, platform, style)
       });
     }
   } else {
     return res.json({
       success: true,
-      text: generateSimulatedCopy(productName, price, language),
+      text: generateSimulatedCopy(productName, price, language, platform, style),
       simulated: true
     });
   }
 });
-function generateSimulatedCopy(productName, price, language) {
+function generateSimulatedCopy(productName, price, language, platform = "facebook", style = "ugc_hook") {
   const finalPrice = price ? `${price}/- BDT` : "\u09B8\u09BE\u09B6\u09CD\u09B0\u09DF\u09C0 \u09AE\u09C2\u09B2\u09CD\u09AF";
+  if (platform === "tiktok") {
+    if (language === "bengali" || language === "both") {
+      let styleTitle = "\u099F\u09CD\u09B0\u09C7\u09A8\u09CD\u09A1\u09BF\u0982 UGC (\u0987\u0989\u099C\u09BE\u09B0 \u099C\u09C7\u09A8\u09BE\u09B0\u09C7\u099F\u09C7\u09A1 \u0995\u09A8\u09CD\u099F\u09C7\u09A8\u09CD\u099F) \u09B9\u09C1\u0995";
+      let hookVO = `"\u09AB\u09C7\u09B8\u09AC\u09C1\u0995 \u0986\u09B0 \u099F\u09BF\u0995\u099F\u0995\u09C7 \u098F\u0987 \u09AA\u09CD\u09B0\u09CB\u09A1\u09BE\u0995\u09CD\u099F\u099F\u09BE \u098F\u09A4\u09AC\u09BE\u09B0 \u09A6\u09C7\u0996\u09C7\u099B\u09BF \u09AF\u09C7 \u09B6\u09C7\u09B7\u09AE\u09C7\u09B6 \u0995\u09BF\u09A8\u09C7\u0987 \u09AB\u09C7\u09B2\u09B2\u09BE\u09AE! \u0986\u09B0 \u09B8\u09A4\u09CD\u09AF\u09BF \u09AC\u09B2\u09A4\u09C7..."`;
+      if (style === "problem_solution") {
+        styleTitle = "\u09B8\u09AE\u09B8\u09CD\u09AF\u09BE \u0993 \u09B8\u09AE\u09BE\u09A7\u09BE\u09A8 \u09B8\u09CD\u099F\u09BE\u0987\u09B2 (Pain-point Solver)";
+        hookVO = `"\u0986\u09AA\u09A8\u09BE\u09B0 \u0995\u09BF \u09AA\u09CD\u09B0\u09A4\u09BF\u09A6\u09BF\u09A8 \u098F\u0987 \u09A7\u09B0\u09A3\u09C7\u09B0 \u09B8\u09AE\u09B8\u09CD\u09AF\u09BE\u09DF \u09AA\u09DC\u09A4\u09C7 \u09B9\u09DF? \u09A4\u09BE\u09B9\u09B2\u09C7 \u098F\u0987 \u09AD\u09BF\u09A1\u09BF\u0993\u099F\u09BF \u0986\u09AA\u09A8\u09BE\u09B0 \u099C\u09A8\u09CD\u09AF\u0987!"`;
+      } else if (style === "asmr_unboxing") {
+        styleTitle = "ASMR \u0993 \u098F\u09B8\u09CD\u09A5\u09C7\u099F\u09BF\u0995 \u0986\u09A8\u09AC\u0995\u09CD\u09B8\u09BF\u0982";
+        hookVO = `"*\u09AA\u09CD\u09B0\u09CB\u09A1\u09BE\u0995\u09CD\u099F \u0996\u09CB\u09B2\u09BE\u09B0 \u09B8\u09C1\u09A8\u09CD\u09A6\u09B0 \u09AE\u09C3\u09A6\u09C1 \u09B6\u09AC\u09CD\u09A6* \u0986\u09B9! \u098F\u09AC\u09BE\u09B0 \u09A6\u09C7\u0996\u09C1\u09A8 \u0986\u09B8\u09B2 \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09DF\u09BE\u09AE \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF \u0995\u09BE\u0995\u09C7 \u09AC\u09B2\u09C7..."`;
+      } else if (style === "direct_promo") {
+        styleTitle = "\u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09A7\u09BE\u09AE\u09BE\u0995\u09BE \u0985\u09AB\u09BE\u09B0 \u09AA\u09CD\u09B0\u09CB\u09AE\u09CB";
+        hookVO = `"\u09A5\u09BE\u09AE\u09C1\u09A8! \u0986\u09AA\u09A8\u09BF \u0995\u09BF \u098F\u0996\u09A8\u0993 \u09AC\u09BE\u099C\u09BE\u09B0\u09C7 \u09B8\u09C7\u09B0\u09BE \u09AE\u09C2\u09B2\u09CD\u09AF\u09C7 \u09B8\u09A0\u09BF\u0995 \u09AA\u09CD\u09B0\u09CB\u09A1\u09BE\u0995\u09CD\u099F\u099F\u09BF \u0996\u09C1\u0981\u099C\u099B\u09C7\u09A8? \u0986\u099C\u0987 \u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u0995\u09B0\u09C1\u09A8!"`;
+      }
+      return `\u{1F3AC} [\u09AD\u09BF\u09A1\u09BF\u0993 \u0986\u0987\u09A1\u09BF\u09DF\u09BE]: ${styleTitle} - "\u0986\u09AE\u09BE\u09B0 \u099C\u09C0\u09AC\u09A8 \u09AC\u09A6\u09B2\u09C7 \u09A6\u09C7\u0993\u09DF\u09BE \u098F\u0995\u099F\u09BF \u09AA\u09CD\u09B0\u09CB\u09A1\u09BE\u0995\u09CD\u099F!"
+
+\u{1F552} \u09E6:\u09E6\u09E6 - \u09E6:\u09E6\u09E9 [\u09AD\u09BF\u09A1\u09BF\u0993 \u09A6\u09C3\u09B6\u09CD\u09AF]: \u09AA\u09CD\u09B0\u09CB\u09A1\u09BE\u0995\u09CD\u099F\u099F\u09BF \u0986\u09A8\u09AC\u0995\u09CD\u09B8 \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7, \u09AC\u09CD\u09AF\u09BE\u0995\u0997\u09CD\u09B0\u09BE\u0989\u09A8\u09CD\u09A1\u09C7 \u098F\u0995\u099F\u09BF \u099F\u09CD\u09B0\u09C7\u09A8\u09CD\u09A1\u09BF\u0982 \u0986\u09AA\u09AC\u09BF\u099F \u09AE\u09BF\u0989\u099C\u09BF\u0995 \u09AC\u09BE\u099C\u099B\u09C7\u0964
+\u{1F399}\uFE0F [\u09AD\u09DF\u09C7\u09B8\u0993\u09AD\u09BE\u09B0]: ${hookVO}
+
+\u{1F552} \u09E6:\u09E6\u09E9 - \u09E6:\u09E7\u09E8 [\u09AD\u09BF\u09A1\u09BF\u0993 \u09A6\u09C3\u09B6\u09CD\u09AF]: \u09AA\u09CD\u09B0\u09CB\u09A1\u09BE\u0995\u09CD\u099F\u099F\u09BF\u09B0 \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09DF\u09BE\u09AE \u09AB\u09BF\u09A8\u09BF\u09B6 \u0995\u09CD\u09B2\u09CB\u099C-\u0986\u09AA\u09C7 \u09A6\u09C7\u0996\u09BE\u09A8\u09CB \u09B9\u099A\u09CD\u099B\u09C7 \u098F\u09AC\u0982 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09A4\u09C7 \u09B9\u09DF \u09A4\u09BE \u09A6\u09C7\u0996\u09BE\u09A8\u09CB \u09B9\u099A\u09CD\u099B\u09C7\u0964
+\u{1F399}\uFE0F [\u09AD\u09DF\u09C7\u09B8\u0993\u09AD\u09BE\u09B0]: "\u098F\u09B0 \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF \u09B8\u09A4\u09CD\u09AF\u09BF\u0987 \u0985\u09B8\u09BE\u09A7\u09BE\u09B0\u09A3! \u098F\u099F\u09BF \u0986\u09AA\u09A8\u09BE\u09B0 \u09AA\u09CD\u09B0\u09A4\u09BF\u09A6\u09BF\u09A8\u09C7\u09B0 \u0995\u09BE\u099C\u0995\u09C7 \u0995\u09B0\u09C7 \u09A4\u09C1\u09B2\u09AC\u09C7 \u0985\u09A8\u09C7\u0995 \u09B8\u09B9\u099C \u0986\u09B0 \u0986\u09B0\u09BE\u09AE\u09A6\u09BE\u09DF\u0995\u0964"
+
+\u{1F552} \u09E6:\u09E7\u09E8 - \u09E6:\u09E7\u09EB [\u09AD\u09BF\u09A1\u09BF\u0993 \u09A6\u09C3\u09B6\u09CD\u09AF]: \u09AB\u09CB\u09A8\u09C7\u09B0 \u09B8\u09CD\u0995\u09CD\u09B0\u09BF\u09A8\u09C7 \u09B2\u09BE\u0987\u09AD \u0995\u09C1\u09B0\u09BF\u09DF\u09BE\u09B0 \u099F\u09CD\u09B0\u09CD\u09AF\u09BE\u0995\u09BF\u0982 \u0993 \u0995\u09CD\u09AF\u09BE\u09B6 \u0985\u09A8 \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF \u09AA\u09BE\u09B0\u09CD\u09B8\u09C7\u09B2 \u09AA\u09BE\u0993\u09DF\u09BE\u09B0 \u09A6\u09C3\u09B6\u09CD\u09AF\u0964
+\u{1F399}\uFE0F [\u09AD\u09DF\u09C7\u09B8\u0993\u09AD\u09BE\u09B0]: "\u09B8\u09AC\u099A\u09C7\u09AF\u09BC\u09C7 \u09AD\u09BE\u09B2\u09CB \u09B2\u09C7\u0997\u09C7\u099B\u09C7 \u098F\u09A6\u09C7\u09B0 \u09B2\u09BE\u0987\u09AD \u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u099F\u09CD\u09B0\u09CD\u09AF\u09BE\u0995\u09BF\u0982 \u0986\u09B0 \u0995\u09CD\u09AF\u09BE\u09B6 \u0985\u09A8 \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF \u09B8\u09C1\u09AC\u09BF\u09A7\u09BE!"
+
+\u{1F4AC} [\u0985\u09A8-\u09B8\u09CD\u0995\u09CD\u09B0\u09BF\u09A8 \u0995\u09CD\u09AF\u09BE\u09AA\u09B6\u09A8 \u09AC\u09BE \u09B8\u09BE\u09AC\u099F\u09BE\u0987\u099F\u09C7\u09B2]:
+\u{1F449} \u09AE\u09BE\u09A4\u09CD\u09B0 ${finalPrice} \u099F\u09BE\u0995\u09BE\u09DF \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09DF\u09BE\u09AE \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF!
+\u{1F449} \u09B8\u09BE\u09B0\u09BE \u09AC\u09BE\u0982\u09B2\u09BE\u09A6\u09C7\u09B6\u09C7 \u0995\u09CD\u09AF\u09BE\u09B6 \u0985\u09A8 \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF!
+\u{1F449} \u0998\u09B0\u09C7 \u09AC\u09B8\u09C7\u0987 \u09B2\u09BE\u0987\u09AD \u0995\u09C1\u09B0\u09BF\u09DF\u09BE\u09B0 \u099F\u09CD\u09B0\u09CD\u09AF\u09BE\u0995\u09BF\u0982 \u09B8\u09C1\u09AC\u09BF\u09A7\u09BE!
+
+\u{1F4DD} [\u099F\u09BF\u0995\u099F\u0995 \u09AA\u09CB\u09B8\u09CD\u099F \u0995\u09CD\u09AF\u09BE\u09AA\u09B6\u09A8]:
+TikTok made me buy it! \u{1F631} \u0985\u09AC\u09B6\u09C7\u09B7\u09C7 \u09AA\u09C7\u09DF\u09C7 \u0997\u09C7\u09B2\u09BE\u09AE \u0986\u09B8\u09B2 "${productName}"\u0964 \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF \u099C\u09BE\u09B8\u09CD\u099F \u0993\u09DF\u09BE\u0993! \u098F\u0996\u09A8\u0987 \u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u0995\u09B0\u09A4\u09C7 \u09A8\u09BF\u099A\u09C7\u09B0 "Shop Now" \u09AC\u09BE\u099F\u09A8\u09C7 \u0995\u09CD\u09B2\u09BF\u0995 \u0995\u09B0\u09C1\u09A8! \u{1F447}\u2728
+#tiktokmademebuyit #foryoupage #bangladesh #onlineshopping #premium #trending #viral`;
+    } else {
+      let styleTitle = "Trending UGC Hook";
+      let hookVO = `"Okay, so I've been seeing this product all over my FYP, and I finally gave in and ordered it..."`;
+      if (style === "problem_solution") {
+        styleTitle = "Problem-Solution Style";
+        hookVO = `"Are you tired of dealing with this annoying issue? Let me show you the ultimate life-saver!"`;
+      } else if (style === "asmr_unboxing") {
+        styleTitle = "Aesthetic ASMR Unboxing";
+        hookVO = `"*Crisp unboxing sounds* Ah, the satisfying click of opening this premium parcel..."`;
+      } else if (style === "direct_promo") {
+        styleTitle = "Direct Crazy Offer Promo";
+        hookVO = `"Stop scrolling! If you want the absolute best value with direct home delivery, listen closely!"`;
+      }
+      return `\u{1F3AC} [Video Idea]: ${styleTitle} - "TikTok Made Me Buy It!"
+
+\u{1F552} 0:00 - 0:03 [Visual]: Fast unboxing with a clean ASMR sound and upbeat trending background music.
+\u{1F399}\uFE0F [Voiceover]: ${hookVO}
+
+\u{1F552} 0:03 - 0:12 [Visual]: Close-up showing the premium textures and demonstrating how easily it works in real-time.
+\u{1F399}\uFE0F [Voiceover]: "And honestly? It lives up to the hype! The quality is amazing and it literally saves so much time."
+
+\u{1F552} 0:12 - 0:15 [Visual]: Showcasing the dynamic live courier tracking map on a mobile phone screen.
+\u{1F399}\uFE0F [Voiceover]: "Plus, they have super fast cash on delivery and real-time live tracking!"
+
+\u{1F4AC} [On-Screen Captions]:
+\u{1F449} Premium quality for only ${finalPrice}!
+\u{1F449} Fast Cash on Delivery Nationwide!
+\u{1F449} Live Order Tracking Link!
+
+\u{1F4DD} [TikTok Post Caption]:
+Can't believe I waited this long to get the "${productName}"! \u{1F60D} Game changer and totally worth the hype. Get yours now with Cash on Delivery! \u{1F447}\u2728
+#tiktokmademebuyit #trending #shopping #unboxing #ugc #foryoupage #viral`;
+    }
+  }
   if (language === "bengali" || language === "both") {
     return `\u{1F525} \u09B8\u09C0\u09AE\u09BF\u09A4 \u0985\u09AB\u09BE\u09B0! \u0986\u09AA\u09A8\u09BE\u09B0 \u099C\u09A8\u09CD\u09AF \u09A8\u09BF\u09DF\u09C7 \u098F\u09B2\u09BE\u09AE \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09DF\u09BE\u09AE \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF\u09B0 "${productName}"!
 
