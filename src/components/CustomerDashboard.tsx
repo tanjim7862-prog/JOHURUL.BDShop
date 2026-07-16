@@ -67,12 +67,25 @@ export default function CustomerDashboard({
   // Load / Save Profile
   const [profile, setProfile] = useState<CustomerProfile>(() => {
     const saved = localStorage.getItem("mystore_customer_profile");
-    return saved ? JSON.parse(saved) : {
-      name: "Tanjim Rahman",
-      phone: "01795339373",
-      email: "tanjim7862@gmail.com",
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.email === "tanjim7862@gmail.com" || parsed.phone === "01795339373") {
+        return {
+          name: "",
+          phone: "",
+          email: "",
+          avatar: "🧑‍💻",
+          bio: ""
+        };
+      }
+      return parsed;
+    }
+    return {
+      name: "",
+      phone: "",
+      email: "",
       avatar: "🧑‍💻",
-      bio: "Dedicated online shopper loving high-quality original items."
+      bio: ""
     };
   });
 
@@ -82,28 +95,14 @@ export default function CustomerDashboard({
   // Load / Save Addresses
   const [addresses, setAddresses] = useState<SavedAddress[]>(() => {
     const saved = localStorage.getItem("mystore_customer_addresses");
-    return saved ? JSON.parse(saved) : [
-      {
-        id: "addr-1",
-        label: "Home",
-        name: "Tanjim Rahman",
-        phone: "01795339373",
-        address: "House 45, Road 12, Sector 3, Uttara",
-        district: "Dhaka",
-        thana: "Uttara",
-        isDefault: true
-      },
-      {
-        id: "addr-2",
-        label: "Work",
-        name: "Tanjim Rahman (Office)",
-        phone: "01795339373",
-        address: "Dhaka Trade Center, 11th Floor, Kawran Bazar",
-        district: "Dhaka",
-        thana: "Tejgaon",
-        isDefault: false
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.some((addr: any) => addr.phone === "01795339373" || addr.name === "Tanjim Rahman")) {
+        return [];
       }
-    ];
+      return parsed;
+    }
+    return [];
   });
 
   const [isAddingAddress, setIsAddingAddress] = useState(false);
@@ -278,13 +277,19 @@ export default function CustomerDashboard({
 
             <div className="space-y-1">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <h2 className="text-xl sm:text-2xl font-black">{profile.name}</h2>
+                <h2 className="text-xl sm:text-2xl font-black">
+                  {profile.name || (lang === "bn" ? "অতিথি গ্রাহক" : "Guest Customer")}
+                </h2>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r ${currentTier.color} text-white shadow-xs`}>
                   👑 {lang === "bn" ? currentTier.nameBn : currentTier.nameEn}
                 </span>
               </div>
-              <p className="text-xs text-indigo-200 font-medium font-mono">{profile.phone} • {profile.email}</p>
-              <p className="text-xs text-slate-300 italic max-w-md line-clamp-1">"{profile.bio}"</p>
+              <p className="text-xs text-indigo-200 font-medium font-mono">
+                {profile.phone || (lang === "bn" ? "মোবাইল যুক্ত করুন" : "No Phone Set")} • {profile.email || (lang === "bn" ? "ইমেইল যুক্ত করুন" : "No Email Set")}
+              </p>
+              <p className="text-xs text-slate-300 italic max-w-md line-clamp-1">
+                {profile.bio ? `"${profile.bio}"` : (lang === "bn" ? "কোনো বায়ো যোগ করা হয়নি" : "No bio added yet.")}
+              </p>
             </div>
           </div>
 
@@ -394,7 +399,7 @@ export default function CustomerDashboard({
                       </div>
                       <div>
                         <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">{lang === "bn" ? "কাস্টমারের নাম" : "Full Name"}</span>
-                        <p className="text-sm font-bold text-gray-800">{profile.name}</p>
+                        <p className={`text-sm font-bold ${profile.name ? "text-gray-800" : "text-gray-400 italic"}`}>{profile.name || (lang === "bn" ? "সেট করা হয়নি" : "Not Set")}</p>
                       </div>
                     </div>
 
@@ -404,7 +409,7 @@ export default function CustomerDashboard({
                       </div>
                       <div>
                         <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">{lang === "bn" ? "মোবাইল নম্বর" : "Phone Number"}</span>
-                        <p className="text-sm font-bold text-gray-800 font-mono">{profile.phone}</p>
+                        <p className={`text-sm font-bold font-mono ${profile.phone ? "text-gray-800" : "text-gray-400 italic"}`}>{profile.phone || (lang === "bn" ? "সেট করা হয়নি" : "Not Set")}</p>
                       </div>
                     </div>
 
@@ -414,7 +419,7 @@ export default function CustomerDashboard({
                       </div>
                       <div>
                         <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">{lang === "bn" ? "ইমেইল এড্রেস" : "Email Address"}</span>
-                        <p className="text-sm font-bold text-gray-800 font-mono">{profile.email}</p>
+                        <p className={`text-sm font-bold font-mono ${profile.email ? "text-gray-800" : "text-gray-400 italic"}`}>{profile.email || (lang === "bn" ? "সেট করা হয়নি" : "Not Set")}</p>
                       </div>
                     </div>
                   </div>

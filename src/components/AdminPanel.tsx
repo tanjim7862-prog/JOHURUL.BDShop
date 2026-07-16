@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Product, Order, OrderStatus, Coupon } from "../types";
 import { createDefaultTrackingHistory, updateTrackingHistory } from "../data";
 import watchBannerImg from "../assets/images/watch_banner_1784030925146.jpg";
+import FacebookAdPreview from "./FacebookAdPreview";
 import { 
   DollarSign, Package, ShoppingBag, TrendingUp, Edit3, Trash2, Plus, 
   X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2,
@@ -62,7 +63,8 @@ export default function AdminPanel({
     | "sms"
     | "roles"
     | "users"
-    | "coupons";
+    | "coupons"
+    | "campaign";
 
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState<boolean>(false);
@@ -506,6 +508,7 @@ export default function AdminPanel({
     { id: "customers", labelBn: "গ্রাহক তালিকা", labelEn: "Customers", icon: Users },
     { id: "accounts", labelBn: "হিসাব-নিকাশ", labelEn: "Accounts", icon: CreditCard },
     { id: "coupons", labelBn: "কুপন ও ডিসকাউন্ট", labelEn: "Coupons", icon: Percent },
+    { id: "campaign", labelBn: "ফেসবুক অ্যাড মেকার", labelEn: "FB Ad Maker", icon: Facebook },
     { id: "products", labelBn: "প্রোডাক্ট ম্যানেজার", labelEn: "Products", icon: Package },
     { id: "categories", labelBn: "ক্যাটাগরি", labelEn: "Categories", icon: Layers },
     { id: "authors", labelBn: "লেখকবৃন্দ", labelEn: "Authors", icon: Feather },
@@ -4180,27 +4183,33 @@ export default function AdminPanel({
                             </div>
                           </td>
                           <td className="py-3.5 text-right">
-                            <div className="flex justify-end items-center gap-1.5">
-                              <input
-                                id={`stock-input-${p.id}`}
-                                type="number"
-                                defaultValue={p.stock}
-                                className="w-16 bg-slate-50 border border-gray-250 rounded-lg px-2 py-1 text-center font-mono text-xs font-bold"
-                              />
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const input = document.getElementById(`stock-input-${p.id}`) as HTMLInputElement;
-                                  if (input) {
-                                    const newVal = Number(input.value);
-                                    const updated = products.map(prod => prod.id === p.id ? { ...prod, stock: newVal } : prod);
-                                    onUpdateProducts(updated);
-                                    alert(lang === "bn" ? "স্টক লেভেল সফলভাবে আপডেট হয়েছে!" : "Product stock level updated successfully!");
-                                  }
+                                  const updatedProducts = products.map((prod) =>
+                                    prod.id === p.id ? { ...prod, stock: Math.max(0, prod.stock - 1) } : prod
+                                  );
+                                  onUpdateProducts(updatedProducts);
                                 }}
-                                className="bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg cursor-pointer shadow-xs transition-all"
+                                className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-gray-600 font-bold flex items-center justify-center cursor-pointer transition-colors"
                               >
-                                {lang === "bn" ? "আপডেট" : "Update"}
+                                -
+                              </button>
+                              <span className="w-8 text-center font-mono font-bold text-gray-800 text-xs">
+                                {p.stock}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedProducts = products.map((prod) =>
+                                    prod.id === p.id ? { ...prod, stock: prod.stock + 1 } : prod
+                                  );
+                                  onUpdateProducts(updatedProducts);
+                                }}
+                                className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-gray-600 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                              >
+                                +
                               </button>
                             </div>
                           </td>
@@ -4215,107 +4224,108 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* RENDER DELIVERY */}
-      {activeTab === "delivery" && (
+      {/* RENDER USERS */}
+      {activeTab === "users" && (
         <div className="space-y-6 animate-fade-in animate-duration-200">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
             <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
-              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "শিপিং চার্জ কনফিগারেশন" : "Courier Shipping Rates"}</h4>
-              <div className="space-y-3">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন স্টাফ প্রোফাইল অ্যাড করুন" : "Register Admin Staff Account"}</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newStaffEmail) return;
+                const newUser = {
+                  email: newStaffEmail,
+                  role: newStaffRole,
+                  status: "Active",
+                  lastLogin: "Never"
+                };
+                setAdminUsers([...adminUsers, newUser]);
+                setNewStaffEmail("");
+                alert(lang === "bn" ? "স্টাফ সফলভাবে রেজিস্টার করা হয়েছে!" : "Staff registered successfully!");
+              }} className="space-y-3 font-sans">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ঢাকার ভেতরে" : "Inside Dhaka"}</label>
-                  <div className="flex font-mono">
-                    <span className="bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl px-3 py-2 text-xs font-black flex items-center">৳</span>
-                    <input
-                      type="number"
-                      value={deliveryConfig.insideDhaka}
-                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, insideDhaka: Number(e.target.value) })}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-r-xl px-3 py-2 text-xs font-bold focus:outline-none"
-                    />
-                  </div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Staff Email ID</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. staff@gms.com"
+                    value={newStaffEmail}
+                    onChange={(e) => setNewStaffEmail(e.target.value)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase">{lang === "bn" ? "ঢাকার বাইরে" : "Outside Dhaka"}</label>
-                  <div className="flex font-mono">
-                    <span className="bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl px-3 py-2 text-xs font-black flex items-center">৳</span>
-                    <input
-                      type="number"
-                      value={deliveryConfig.outsideDhaka}
-                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, outsideDhaka: Number(e.target.value) })}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-r-xl px-3 py-2 text-xs font-bold focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase">Preferred Courier Provider</label>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Assigned Role</label>
                   <select
-                    value={deliveryConfig.provider}
-                    onChange={(e) => setDeliveryConfig({ ...deliveryConfig, provider: e.target.value })}
+                    value={newStaffRole}
+                    onChange={(e) => setNewStaffRole(e.target.value)}
                     className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                   >
-                    <option value="Pathao">Pathao Courier (পাঠাও কুরিয়ার)</option>
-                    <option value="RedX">RedX Logistics (রেডএক্স ডেলিভারি)</option>
-                    <option value="Steadfast">Steadfast Courier (স্টিডফাস্ট)</option>
-                    <option value="eCourier">eCourier BD (ই-কুরিয়ার)</option>
+                    <option value="Sales Manager">Sales Manager</option>
+                    <option value="Delivery Partner">Delivery Partner</option>
                   </select>
                 </div>
                 <button
-                  type="button"
-                  onClick={() => {
-                    alert(lang === "bn" ? "শিপিং রেট এবং সেটিংস সফলভাবে আপডেট হয়েছে!" : "Shipping rates and provider saved successfully!");
-                  }}
+                  type="submit"
                   className="w-full bg-[#3730a3] hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
                 >
-                  💾 Save Shipping Rates
+                  ➕ Register Staff Profile
                 </button>
-              </div>
+              </form>
             </div>
 
             <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
-              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "কুরিয়ার API কানেকশন ও বুকিং" : "Courier APIs Integration Live Hub"}</h4>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
-                  <span className="text-[9px] text-emerald-800 font-black block tracking-wider uppercase">Courier Gateway</span>
-                  <div className="text-emerald-700 font-black text-xs mt-1">CONNECTED</div>
-                </div>
-                <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-center">
-                  <span className="text-[9px] text-indigo-800 font-black block tracking-wider uppercase">Pending Shipments</span>
-                  <div className="text-[#3730a3] font-black text-xs mt-1 font-mono">
-                    {orders.filter(o => o.status === OrderStatus.RECEIVED || o.status === OrderStatus.PROCESSING).length} consignments
-                  </div>
-                </div>
-                <div className="p-3 bg-purple-50 rounded-2xl border border-purple-100 text-center">
-                  <span className="text-[9px] text-purple-800 font-black block tracking-wider uppercase">Fulfilled Rate</span>
-                  <div className="text-purple-700 font-black text-xs mt-1">94.2% delivery success</div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-2xl border border-gray-100 space-y-3 font-sans">
-                <h5 className="font-extrabold text-xs text-gray-800 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
-                  {deliveryConfig.provider} Bulk Shipment Booker
-                </h5>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Bulk sync pending orders with your courier backend instantly. Auto-generates billing consignment barcodes, assigns tracking slips, and exports shipping details directly.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const count = orders.filter(o => o.status === OrderStatus.PROCESSING).length;
-                    if (count === 0) {
-                      alert(lang === "bn" ? "বুকিং করার মতো কোনো PROCESSING অর্ডার নেই।" : "No PROCESSING status orders ready for booking.");
-                    } else {
-                      alert(lang === "bn" ? `${count}টি অর্ডার সফলভাবে কুরিয়ার ড্যাশবোর্ডে বুক করা হয়েছে এবং বারকোড স্লিপ জেনারেট করা হয়েছে!` : `${count} orders successfully booked with ${deliveryConfig.provider} and shipping barcodes generated!`);
-                    }
-                  }}
-                  className="bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] font-bold text-xs px-4 py-2.5 rounded-xl border border-indigo-100 hover:scale-[1.02] transition-all cursor-pointer"
-                >
-                  🚀 Bulk Book Confirmed Invoices with {deliveryConfig.provider}
-                </button>
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Authorized Admin User Directory</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase pb-2">
+                      <th className="pb-3">EMAIL ID</th>
+                      <th className="pb-3">ASSIGNED ROLE</th>
+                      <th className="pb-3">LAST SIGN-IN</th>
+                      <th className="pb-3">ACCOUNT STATUS</th>
+                      <th className="pb-3 text-right">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-gray-700 font-medium font-sans">
+                    {adminUsers.map((u, i) => (
+                      <tr key={i}>
+                        <td className="py-3 font-bold text-gray-900">{u.email}</td>
+                        <td className="py-3">
+                          <span className="bg-indigo-50 text-[#3730a3] border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold">{u.role}</span>
+                        </td>
+                        <td className="py-3 text-gray-400 font-semibold font-mono">{u.lastLogin}</td>
+                        <td className="py-3">
+                          <span className="bg-green-50 text-green-700 font-bold text-[9px] px-2.5 py-0.5 rounded-full border border-green-100">{u.status}</span>
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const confirmed = window.confirm(`Reset credentials for ${u.email}?`);
+                              if (confirmed) {
+                                  alert("Simulation: A verification PIN reset link has been dispatched.");
+                              }
+                            }}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-2 py-1 rounded text-[10px] cursor-pointer"
+                          >
+                            Reset credentials
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* RENDER CAMPAIGN */}
+      {activeTab === "campaign" && (
+        <div className="space-y-6 animate-fade-in animate-duration-200 bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+          <FacebookAdPreview products={products} lang={lang} />
         </div>
       )}
 

@@ -51,7 +51,7 @@ export default function App() {
   }, []);
 
   // Core navigation state
-  const [currentView, setCurrentView] = useState<"shop" | "track" | "campaign" | "admin" | "account">("shop");
+  const [currentView, setCurrentView] = useState<"shop" | "track" | "admin" | "account">("shop");
 
   // Core admin credentials and session state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -1435,17 +1435,6 @@ export default function App() {
             🔍 {lang === "bn" ? "অর্ডার ট্র্যাকিং" : "Order Tracking"}
           </button>
           <button
-            id="nav-tab-campaign"
-            onClick={() => setCurrentView("campaign")}
-            className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
-              currentView === "campaign"
-                ? "bg-[#3730a3] text-white shadow-sm"
-                : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
-            }`}
-          >
-            📢 {lang === "bn" ? "ফেসবুক অ্যাড ক্রিয়েটর" : "FB Ad Maker"}
-          </button>
-          <button
             id="nav-tab-account"
             onClick={() => setCurrentView("account")}
             className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
@@ -1489,14 +1478,6 @@ export default function App() {
         >
           <span className="text-lg">🔍</span>
           <span>{lang === "bn" ? "ট্র্যাকিং" : "Track"}</span>
-        </button>
-        <button
-          id="mobile-nav-campaign"
-          onClick={() => setCurrentView("campaign")}
-          className={`flex flex-col items-center gap-0.5 ${currentView === "campaign" ? "text-[#3730a3]" : "text-gray-400"}`}
-        >
-          <span className="text-lg">📢</span>
-          <span>{lang === "bn" ? "অ্যাড মেকার" : "Ads"}</span>
         </button>
         <button
           id="mobile-nav-account"
@@ -1872,32 +1853,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 3: CAMPAIGN AD CREATOR */}
-        {currentView === "campaign" && (
-          <div className="space-y-6">
-            {/* Context Hero */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden flex items-center justify-between gap-4">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.1),transparent)] pointer-events-none"></div>
-              <div>
-                <span className="text-[10px] font-bold tracking-widest uppercase bg-white/20 px-3 py-1 rounded-full text-indigo-100">
-                  Smart Facebook Promotion
-                </span>
-                <h2 className="text-xl sm:text-indigo-900lue-600xl font-black mt-3">
-                  {lang === "bn" ? "ফেসবুক অ্যাড ক্যাম্পেইন ক্রিয়েটর (AI)" : "AI-Powered Facebook Ad Campaign Builder"}
-                </h2>
-                <p className="text-xs sm:text-sm text-indigo-100 max-w-xl mt-1">
-                  {lang === "bn"
-                    ? "ওপেন সোর্স সলিউশন দিয়ে সহজেই ফেসবুক পেজে ক্যাম্পেইন করুন। জেনারেট করুন আকর্ষণীয় ট্র্যাকিং ল্যান্ডিং লিংক যা কাস্টমারকে সরাসরি পণ্যের চেকআউটে নিয়ে আসবে!"
-                    : "Create highly professional Facebook copy and unique tracking URLs that deep-link users directly to target items on this platform."}
-                </p>
-              </div>
-              <span className="text-indigo-900lue-600xl hidden md:block">📢</span>
-            </div>
 
-            {/* Campaign Widget */}
-            <FacebookAdPreview products={products} lang={lang} />
-          </div>
-        )}
 
         {/* VIEW 4: ADMIN CONTROLLER */}
         {currentView === "admin" && (
@@ -2784,8 +2740,6 @@ export default function App() {
             <span className="hover:text-[#3730a3] transition-colors cursor-pointer" onClick={() => setCurrentView("shop")}>🛍️ {lang === "bn" ? "হোম পেজ" : "Home Storefront"}</span>
             <span>·</span>
             <span className="hover:text-[#3730a3] transition-colors cursor-pointer" onClick={() => setCurrentView("track")}>🔍 {lang === "bn" ? "লাইভ কুরিয়ার ট্র্যাকিং" : "Courier Tracking"}</span>
-            <span>·</span>
-            <span className="hover:text-[#3730a3] transition-colors cursor-pointer" onClick={() => setCurrentView("campaign")}>📢 {lang === "bn" ? "ফেসবুক মার্কেটিং টুল" : "FB Ads Assistant"}</span>
             {showAdminEntryPoints && (
               <>
                 <span>·</span>
