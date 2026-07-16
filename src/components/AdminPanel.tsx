@@ -9,7 +9,7 @@ import {
   X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2,
   LayoutDashboard, Users, CreditCard, Layers, Feather, BookOpen, Image as ImageIcon,
   Activity, Globe, Truck, MessageSquare, Key, Settings, UserCheck, Menu, ChevronRight,
-  ChevronLeft, Search, FileText, Percent, TrendingDown, ArrowUpRight, Sparkles, Printer
+  ChevronLeft, Search, FileText, Percent, TrendingDown, ArrowUpRight, Sparkles, Printer, RefreshCw
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -166,6 +166,31 @@ export default function AdminPanel({
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "dead">("all");
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+
+  // Server-Side Backend Analytics state
+  const [backendAnalytics, setBackendAnalytics] = useState<any>(null);
+  const [isFetchLoading, setIsFetchLoading] = useState<boolean>(false);
+
+  const fetchBackendAnalytics = async () => {
+    setIsFetchLoading(true);
+    try {
+      const res = await fetch("/api/admin/analytics");
+      if (res.ok) {
+        const data = await res.json();
+        setBackendAnalytics(data);
+      }
+    } catch (err) {
+      console.error("Failed to load backend analytics:", err);
+    } finally {
+      setIsFetchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "analytics") {
+      fetchBackendAnalytics();
+    }
+  }, [activeTab]);
 
   // Supplier/Shop WhatsApp mappings state
   const [supplierPhoneMap, setSupplierPhoneMap] = useState<Record<string, string>>(() => {
@@ -789,6 +814,94 @@ export default function AdminPanel({
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Server-Side Financial Report section */}
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl p-6 border border-indigo-100 relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider">
+                      {lang === "bn" ? "এক্সপ্রেস ব্যাকএন্ড রিপোর্ট" : "EXPRESS BACKEND REPORT"}
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping"></span>
+                  </div>
+                  <h4 className="text-lg font-black text-gray-900 tracking-tight">
+                    {lang === "bn" ? "সার্ভার-সাইড আর্থিক কর্মক্ষমতা হিসাব" : "Server-Side Live Financial Performance"}
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    {lang === "bn" 
+                      ? "পণ্য ক্রয়ের আসল খরচ (COGS), ফেসবুক এডস প্রচারণার খরচ (CPA) এবং কুরিয়ার ওভারহেডসহ স্বয়ংক্রিয় হিসাব।"
+                      : "Calculated with live Cost of Goods Sold (COGS), Facebook marketing costs, and shipping overheads."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchBackendAnalytics}
+                  disabled={isFetchLoading}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-xs rounded-2xl shadow-xs transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isFetchLoading ? 'animate-spin' : ''}`} />
+                  {lang === "bn" ? "ব্যাকএন্ড রিফ্রেশ করুন" : "Refresh Server Stats"}
+                </button>
+              </div>
+
+              {isFetchLoading && !backendAnalytics ? (
+                <div className="py-8 flex flex-col items-center justify-center gap-2 text-indigo-600">
+                  <RefreshCw className="w-8 h-8 animate-spin" />
+                  <span className="text-xs font-black tracking-widest uppercase animate-pulse">Loading Server Calculations...</span>
+                </div>
+              ) : backendAnalytics ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Revenue Card */}
+                  <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-indigo-100/60 shadow-xs">
+                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider block mb-1">
+                      {lang === "bn" ? "মোট বিক্রয় মূল্য (Revenue)" : "AGGREGATED REVENUE"}
+                    </span>
+                    <span className="text-2xl font-black text-gray-900">৳{backendAnalytics.summary.totalRevenue}</span>
+                    <div className="mt-2 text-[10px] text-gray-500 flex justify-between">
+                      <span>{lang === "bn" ? "অর্ডার সংখ্যা:" : "Total Orders:"} {backendAnalytics.ordersStats.totalOrders}</span>
+                      <span>{lang === "bn" ? "গড় অর্ডার মূল্য:" : "Avg Order BDT:"} ৳{backendAnalytics.summary.averageOrderValue}</span>
+                    </div>
+                  </div>
+
+                  {/* Expenses Card */}
+                  <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-red-100 shadow-xs">
+                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block mb-1">
+                      {lang === "bn" ? "মোট ব্যয় (Total Expenses)" : "TOTAL EXPENSES BREAKDOWN"}
+                    </span>
+                    <span className="text-2xl font-black text-rose-600">৳{backendAnalytics.summary.totalExpenses}</span>
+                    <div className="mt-2 text-[9px] text-gray-500 grid grid-cols-2 gap-1 border-t border-gray-50 pt-1.5">
+                      <span className="truncate">COGS: ৳{backendAnalytics.breakdown.cogs}</span>
+                      <span className="truncate">Marketing CPA: ৳{backendAnalytics.breakdown.adSpend}</span>
+                      <span className="truncate">Shipping Fees: ৳{backendAnalytics.breakdown.shippingCost}</span>
+                      <span className="truncate">Overhead Fixed: ৳{backendAnalytics.breakdown.overheadFixed}</span>
+                    </div>
+                  </div>
+
+                  {/* Net Profit Card */}
+                  <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-emerald-100 shadow-xs">
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider block mb-1">
+                      {lang === "bn" ? "নিট লাভ এবং মার্জিন (Net Profit)" : "NET PROFIT & MARGIN"}
+                    </span>
+                    <span className="text-2xl font-black text-emerald-600">৳{backendAnalytics.summary.netProfit}</span>
+                    <div className="mt-2 text-[10px] text-gray-500 flex justify-between items-center">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-[10px]">
+                        Margin: {backendAnalytics.summary.profitMarginPercentage}%
+                      </span>
+                      <span className="font-semibold text-gray-400 text-[10px]">
+                        Active: {backendAnalytics.ordersStats.processingOrders} | DLV: {backendAnalytics.ordersStats.successfulOrders}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white/80 rounded-2xl p-4 text-center border border-indigo-100/50">
+                  <span className="text-xs font-bold text-gray-400">
+                    {lang === "bn" ? "সার্ভার অ্যানালিটিক্স লোড করা সম্ভব হয়নি। পুনরায় চেষ্টা করুন।" : "Click 'Refresh Server Stats' to load real-time database financial aggregations."}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Top Summary Cards Grid */}

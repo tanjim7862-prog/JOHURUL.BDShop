@@ -936,6 +936,33 @@ export default function App() {
       }))
     });
 
+    // Sync order registration with backend Express API
+    fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerName,
+        customerPhone,
+        customerAddress,
+        customerDivision,
+        customerDistrict,
+        customerThana,
+        cartItems: [...cart],
+        couponCode,
+        paymentMethod: checkoutPaymentMethod,
+        onlineGatewayType: checkoutPaymentMethod === "online" ? onlineGatewayType : undefined,
+        paymentTransactionId: checkoutPaymentMethod === "online" ? paymentTransactionId : undefined,
+        fbCampaignRef: campaignRef
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log("Order logged on Express backend server:", data);
+    })
+    .catch(err => {
+      console.error("Express backend server checkout logging failed:", err);
+    });
+
     updateProductsAndSync(updatedProducts);
     updateOrdersAndSync([newOrder, ...orders]);
     setCart([]);

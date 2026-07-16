@@ -3,11 +3,163 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { INITIAL_PRODUCTS, createDefaultTrackingHistory } from "./src/data";
+import { Product, Order, OrderStatus, Coupon } from "./src/types";
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+
+// In-Memory Database for backend processing
+let backendProducts: Product[] = [...INITIAL_PRODUCTS];
+
+let backendCoupons: Coupon[] = [
+  {
+    id: "c-1",
+    code: "FB20",
+    type: "percentage",
+    value: 20,
+    minPurchase: 0,
+    isActive: true,
+    descriptionEn: "Facebook Ad Campaign Special 20% discount",
+    descriptionBn: "ফেসবুক অ্যাড স্পেশাল ২০% ডিসকাউন্ট"
+  },
+  {
+    id: "c-2",
+    code: "FLASH10",
+    type: "percentage",
+    value: 10,
+    minPurchase: 1500,
+    isActive: true,
+    descriptionEn: "Flash Sale 10% discount",
+    descriptionBn: "ফ্ল্যাশ সেল ১০% ডিসকাউন্ট"
+  },
+  {
+    id: "c-3",
+    code: "SAVE200",
+    type: "flat",
+    value: 200,
+    minPurchase: 2000,
+    isActive: true,
+    descriptionEn: "Flat 200 Taka discount on orders above 2000 BDT",
+    descriptionBn: "২০০০ টাকার বেশি অর্ডারে ২০০ টাকা ফ্ল্যাট ছাড়"
+  }
+];
+
+// Let's populate some initial historical orders for beautiful, instant Admin Analytics charts
+let backendOrders: Order[] = [
+  {
+    id: "TRK-98312",
+    customerName: "Rahim Islam",
+    customerPhone: "01712345678",
+    customerAddress: "House 12, Road 4, Dhanmondi",
+    customerDivision: "Dhaka (ঢাকা)",
+    customerDistrict: "Dhaka (ঢাকা)",
+    customerThana: "Dhanmondi (ধানমন্ডি)",
+    cartItems: [
+      {
+        product: INITIAL_PRODUCTS[0], // Premium Leather Wallet (1250)
+        quantity: 1,
+        selectedColor: "Black"
+      },
+      {
+        product: INITIAL_PRODUCTS[1], // True Wireless Earbuds (2490)
+        quantity: 1,
+        selectedColor: "Matte Black"
+      }
+    ],
+    totalAmount: 3740,
+    paymentMethod: "cod",
+    status: OrderStatus.DELIVERED,
+    trackingHistory: createDefaultTrackingHistory(new Date(Date.now() - 4 * 24 * 60 * 60 * 1000)),
+    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: "TRK-45129",
+    customerName: "Sultana Razia",
+    customerPhone: "01823456789",
+    customerAddress: "Sector 4, Uttara",
+    customerDivision: "Dhaka (ঢাকা)",
+    customerDistrict: "Dhaka (ঢাকা)",
+    customerThana: "Uttara (উত্তরা)",
+    cartItems: [
+      {
+        product: INITIAL_PRODUCTS[2], // Minimalist Smart Watch (3200)
+        quantity: 2,
+        selectedColor: "Carbon Grey"
+      }
+    ],
+    totalAmount: 6400,
+    paymentMethod: "online",
+    onlineGatewayType: "bkash",
+    paymentTransactionId: "BKASH_TXN_98231",
+    status: OrderStatus.DELIVERED,
+    trackingHistory: createDefaultTrackingHistory(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)),
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: "TRK-10293",
+    customerName: "Zamil Uddin",
+    customerPhone: "01934567890",
+    customerAddress: "Halee Shahar, Chattogram",
+    customerDivision: "Chattogram (চট্টগ্রাম)",
+    customerDistrict: "Chattogram (চট্টগ্রাম)",
+    customerThana: "Patiya (পটিয়া)",
+    cartItems: [
+      {
+        product: INITIAL_PRODUCTS[3], // Premium Cotton Panjabi (1850)
+        quantity: 1,
+        selectedColor: "Pure White",
+        selectedSize: "XL"
+      }
+    ],
+    totalAmount: 1850,
+    paymentMethod: "cod",
+    status: OrderStatus.SHIPPED,
+    trackingHistory: createDefaultTrackingHistory(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)),
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: "TRK-88231",
+    customerName: "Tanvir Ahmed",
+    customerPhone: "01545678901",
+    customerAddress: "Sreemangal Road, Moulvibazar",
+    customerDivision: "Sylhet (সিলেট)",
+    customerDistrict: "Moulvibazar (মৌলভীবাজার)",
+    cartItems: [
+      {
+        product: INITIAL_PRODUCTS[4], // Organic Sylhet Tea Leaves (380)
+        quantity: 3
+      }
+    ],
+    totalAmount: 1140,
+    paymentMethod: "cod",
+    status: OrderStatus.RECEIVED,
+    trackingHistory: createDefaultTrackingHistory(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)),
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: "TRK-22410",
+    customerName: "Mariam Begum",
+    customerPhone: "01656789012",
+    customerAddress: "Kazipara, Mirpur",
+    customerDivision: "Dhaka (ঢাকা)",
+    customerDistrict: "Dhaka (ঢাকা)",
+    customerThana: "Mirpur (মিরপুর)",
+    cartItems: [
+      {
+        product: INITIAL_PRODUCTS[7], // Natural Glow Face Serum (950)
+        quantity: 1
+      }
+    ],
+    totalAmount: 950,
+    paymentMethod: "cod",
+    status: OrderStatus.RECEIVED,
+    trackingHistory: createDefaultTrackingHistory(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+  }
+];
 
 const PORT = 3000;
 
@@ -99,6 +251,304 @@ Ensure the style is extremely professional, friendly, and culturally relevant to
       simulated: true
     });
   }
+});
+
+// 1. Advanced Product Filter & Smart Search API
+app.get("/api/products/search", (req, res) => {
+  const { q, category, priceMin, priceMax, minRating, stockStatus, sortBy } = req.query;
+
+  let result = [...backendProducts];
+
+  // 1. Text Search Query (q)
+  if (q) {
+    const searchStr = String(q).toLowerCase().trim();
+    result = result.filter(p => 
+      p.name.toLowerCase().includes(searchStr) ||
+      (p.banglaName && p.banglaName.toLowerCase().includes(searchStr)) ||
+      p.description.toLowerCase().includes(searchStr) ||
+      (p.banglaDescription && p.banglaDescription.toLowerCase().includes(searchStr)) ||
+      p.category.toLowerCase().includes(searchStr)
+    );
+  }
+
+  // 2. Category Filter
+  if (category && category !== "all" && category !== "All") {
+    const catStr = String(category).toLowerCase();
+    result = result.filter(p => p.category.toLowerCase() === catStr);
+  }
+
+  // 3. Price Range Filter
+  if (priceMin !== undefined) {
+    result = result.filter(p => {
+      const activePrice = p.isFlashSale && p.flashSalePrice ? p.flashSalePrice : p.price;
+      return activePrice >= Number(priceMin);
+    });
+  }
+  if (priceMax !== undefined) {
+    result = result.filter(p => {
+      const activePrice = p.isFlashSale && p.flashSalePrice ? p.flashSalePrice : p.price;
+      return activePrice <= Number(priceMax);
+    });
+  }
+
+  // 4. Minimum Rating Filter
+  if (minRating !== undefined) {
+    result = result.filter(p => p.rating >= Number(minRating));
+  }
+
+  // 5. Stock Status Filter
+  if (stockStatus) {
+    if (stockStatus === "in_stock" || stockStatus === "instock") {
+      result = result.filter(p => p.stock > 0);
+    } else if (stockStatus === "out_of_stock" || stockStatus === "outofstock") {
+      result = result.filter(p => p.stock <= 0);
+    }
+  }
+
+  // 6. Sorting
+  if (sortBy === "newest") {
+    result.sort((a, b) => Number(b.id) - Number(a.id));
+  } else if (sortBy === "price_low_high" || sortBy === "priceAsc") {
+    result.sort((a, b) => {
+      const ap = a.isFlashSale && a.flashSalePrice ? a.flashSalePrice : a.price;
+      const bp = b.isFlashSale && b.flashSalePrice ? b.flashSalePrice : b.price;
+      return ap - bp;
+    });
+  } else if (sortBy === "price_high_low" || sortBy === "priceDesc") {
+    result.sort((a, b) => {
+      const ap = a.isFlashSale && a.flashSalePrice ? a.flashSalePrice : a.price;
+      const bp = b.isFlashSale && b.flashSalePrice ? b.flashSalePrice : b.price;
+      return bp - ap;
+    });
+  } else if (sortBy === "rating") {
+    result.sort((a, b) => b.rating - a.rating);
+  } else {
+    // default: popularity / salesCount desc
+    result.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
+  }
+
+  res.json({
+    success: true,
+    count: result.length,
+    products: result
+  });
+});
+
+// 2. Checkout & Order Submission Pipeline
+app.post("/api/checkout", (req, res) => {
+  const {
+    customerName,
+    customerPhone,
+    customerAddress,
+    customerDivision = "Dhaka (ঢাকা)",
+    customerDistrict = "Dhaka (ঢাকা)",
+    customerThana,
+    cartItems,
+    couponCode,
+    paymentMethod = "cod",
+    onlineGatewayType,
+    paymentTransactionId,
+    fbCampaignRef
+  } = req.body;
+
+  // Basic Validation
+  if (!customerName || !customerPhone || !customerAddress) {
+    return res.status(400).json({ error: "Customer name, phone, and detailed address are required" });
+  }
+
+  if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+    return res.status(400).json({ error: "Cart items cannot be empty" });
+  }
+
+  // A. Validate Stock first to avoid partial commits
+  for (const item of cartItems) {
+    const dbProd = backendProducts.find(p => p.id === item.product.id);
+    if (!dbProd) {
+      return res.status(404).json({ error: `Product with ID "${item.product.id}" not found.` });
+    }
+    if (dbProd.stock < item.quantity) {
+      return res.status(400).json({
+        error: `Insufficient stock for product "${dbProd.name}". Available stock is ${dbProd.stock}.`
+      });
+    }
+  }
+
+  // B. Calculate Subtotal
+  let cartSubtotal = 0;
+  cartItems.forEach((item) => {
+    const activePrice = item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+    cartSubtotal += activePrice * item.quantity;
+  });
+
+  // C. Validate and Apply Coupon Discount
+  let discountAmount = 0;
+  let validatedCoupon: Coupon | null = null;
+  if (couponCode) {
+    const cleanCode = String(couponCode).trim().toUpperCase();
+    const coupon = backendCoupons.find(c => c.code === cleanCode && c.isActive);
+    if (coupon) {
+      if (cartSubtotal >= coupon.minPurchase) {
+        validatedCoupon = coupon;
+        if (coupon.type === "percentage") {
+          discountAmount = Math.round((cartSubtotal * coupon.value) / 100);
+        } else {
+          discountAmount = coupon.value;
+        }
+      }
+    }
+  }
+
+  // D. Calculate Delivery Fee (60 Inside Dhaka division / district, 120 Outside)
+  const isInsideDhaka = customerDistrict.toLowerCase().includes("dhaka") || customerDivision.toLowerCase().includes("dhaka");
+  const deliveryCharge = isInsideDhaka ? 60 : 120;
+
+  // Total payable amount
+  const finalPayable = Math.max(0, cartSubtotal - discountAmount + deliveryCharge);
+
+  // E. Update Stock in Backend Database
+  cartItems.forEach((item) => {
+    const dbProd = backendProducts.find(p => p.id === item.product.id)!;
+    dbProd.stock = Math.max(0, dbProd.stock - item.quantity);
+    dbProd.salesCount = (dbProd.salesCount || 0) + item.quantity;
+  });
+
+  // F. Generate order details
+  const orderId = `TRK-${Math.floor(10000 + Math.random() * 90000)}`;
+  const newOrder: Order = {
+    id: orderId,
+    customerName,
+    customerPhone,
+    customerAddress,
+    customerDivision,
+    customerDistrict,
+    customerThana,
+    cartItems,
+    totalAmount: finalPayable,
+    paymentMethod,
+    onlineGatewayType: paymentMethod === "online" ? onlineGatewayType : undefined,
+    paymentTransactionId: paymentMethod === "online" ? paymentTransactionId : undefined,
+    status: OrderStatus.RECEIVED,
+    trackingHistory: createDefaultTrackingHistory(new Date()),
+    createdAt: new Date().toISOString(),
+    fbCampaignRef
+  };
+
+  // Save to backend database
+  backendOrders = [newOrder, ...backendOrders];
+
+  res.status(201).json({
+    success: true,
+    message: "Order submitted and processed successfully!",
+    orderId,
+    order: newOrder,
+    summary: {
+      subtotal: cartSubtotal,
+      discount: discountAmount,
+      deliveryFee: deliveryCharge,
+      total: finalPayable
+    }
+  });
+});
+
+// 3. Admin Analytics Endpoint (aggregating Revenue, Expenses, Net Profit)
+app.get("/api/admin/analytics", (req, res) => {
+  // Filters out cancelled orders for revenue / metrics calculations
+  const nonCancelledOrders = backendOrders.filter(o => o.status !== OrderStatus.CANCELLED);
+
+  // A. Calculate Revenue
+  const totalRevenue = nonCancelledOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+
+  // B. Calculate Expenses (COGS + flat overhead / marketing)
+  let totalCOGS = 0;
+  let totalShippingCost = 0;
+  let totalAdSpend = 0;
+
+  nonCancelledOrders.forEach(order => {
+    // COGS
+    order.cartItems.forEach(item => {
+      const activePrice = item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+      const costPrice = item.product.costPrice || Math.round(activePrice * 0.5); // 50% default COGS
+      totalCOGS += costPrice * item.quantity;
+    });
+
+    // Shipping overhead expense: assume standard flat shipping expense of 80 BDT per order
+    totalShippingCost += 80;
+
+    // Advertising & Marketing cost: Facebook/TikTok campaign CPA (cost-per-acquisition) of roughly 220 BDT per order
+    totalAdSpend += 220;
+  });
+
+  // Flat General operating expense (hosting, maintenance, packing supplies)
+  const overheadFixedCost = 3500;
+
+  const totalExpenses = totalCOGS + totalShippingCost + totalAdSpend + overheadFixedCost;
+
+  // C. Net Profit
+  const netProfit = totalRevenue - totalExpenses;
+
+  // D. Other stats
+  const totalOrdersCount = backendOrders.length;
+  const successfulOrdersCount = backendOrders.filter(o => o.status === OrderStatus.DELIVERED).length;
+  const cancelledOrdersCount = backendOrders.filter(o => o.status === OrderStatus.CANCELLED).length;
+  
+  const averageOrderValue = totalOrdersCount > 0 ? Math.round(totalRevenue / totalOrdersCount) : 0;
+  const profitMarginPercentage = totalRevenue > 0 ? Number(((netProfit / totalRevenue) * 100).toFixed(1)) : 0;
+
+  // Category sales aggregation
+  const revenueByCategory: Record<string, number> = {};
+  nonCancelledOrders.forEach(o => {
+    o.cartItems.forEach(item => {
+      const activePrice = item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+      const cat = item.product.category || "General";
+      const salesVal = activePrice * item.quantity;
+      revenueByCategory[cat] = (revenueByCategory[cat] || 0) + salesVal;
+    });
+  });
+
+  // Generate 7-day sales graph details
+  const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const salesOverTime = Array.from({ length: 7 }).map((_, idx) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - idx));
+    const dateStr = d.toISOString().split("T")[0];
+    const dayName = daysOfWeek[d.getDay()];
+
+    const daysOrders = nonCancelledOrders.filter(o => o.createdAt.startsWith(dateStr));
+    const revenue = daysOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const ordersCount = daysOrders.length;
+
+    return {
+      date: dateStr,
+      day: dayName.substring(0, 3),
+      revenue,
+      orders: ordersCount
+    };
+  });
+
+  res.json({
+    success: true,
+    summary: {
+      totalRevenue,
+      totalExpenses,
+      netProfit,
+      profitMarginPercentage,
+      averageOrderValue
+    },
+    ordersStats: {
+      totalOrders: totalOrdersCount,
+      successfulOrders: successfulOrdersCount,
+      cancelledOrders: cancelledOrdersCount,
+      processingOrders: backendOrders.filter(o => o.status === OrderStatus.PROCESSING || o.status === OrderStatus.RECEIVED).length
+    },
+    breakdown: {
+      cogs: totalCOGS,
+      shippingCost: totalShippingCost,
+      adSpend: totalAdSpend,
+      overheadFixed: overheadFixedCost
+    },
+    revenueByCategory,
+    salesOverTime
+  });
 });
 
 // Helper to generate simulated copies
