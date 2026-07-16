@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { INITIAL_PRODUCTS, createDefaultTrackingHistory } from "./src/data";
 import { Product, Order, OrderStatus, Coupon } from "./src/types";
@@ -251,6 +251,293 @@ Ensure the style is extremely professional, friendly, and culturally relevant to
       simulated: true
     });
   }
+});
+
+// ==========================================
+// ENTERPRISE AI FEATURES ENDPOINTS
+// ==========================================
+
+// 1. AI-Powered Recommendation Engine ("You May Also Like")
+app.post("/api/ai/recommendations", async (req, res) => {
+  const { productId, recentlyViewed = [], purchasedIds = [] } = req.body;
+  const currentProduct = backendProducts.find(p => String(p.id) === String(productId));
+
+  if (!currentProduct) {
+    return res.json({
+      success: true,
+      recommendations: backendProducts.slice(0, 3).map(p => ({
+        ...p,
+        aiReasonEn: "Popular Collection",
+        aiReasonBn: "জনপ্রিয় কালেকশন"
+      }))
+    });
+  }
+
+  const otherProducts = backendProducts.filter(p => String(p.id) !== String(currentProduct.id));
+
+  if (ai) {
+    try {
+      const prompt = `You are an AI-powered Amazon-style personalization and product recommendation engine for a premium Bangladeshi e-commerce store.
+Analyze the user's shopping context and recommend the top 3 best matching/complementary products from the available catalog.
+
+Currently viewed product:
+- Name: ${currentProduct.name}
+- Category: ${currentProduct.category}
+- Description: ${currentProduct.description}
+- Price: ${currentProduct.price} BDT
+
+User's browsing/purchasing history:
+- Recently Viewed IDs: ${recentlyViewed.join(", ")}
+- Already Purchased IDs: ${purchasedIds.join(", ")}
+
+Available Catalog (choose EXACTLY 3-4 from these):
+${otherProducts.map(p => `- ID: ${p.id} | Name: ${p.name} | Category: ${p.category} | Price: ${p.price} BDT | Description: ${p.description}`).join("\n")}
+
+Rules:
+1. Choose exactly 3 or 4 products from the available catalog that are most relevant (cross-selling, upselling, complementary, same category, or stylistic matches).
+2. For each recommendation, provide a short, catchy explanation of why it was recommended (e.g. "Complete your look", "Frequently bought together", "Premium upgrade", "Perfect accessory") in English and also in Bangla.
+3. Return the response in strict JSON format.
+
+JSON schema to follow:
+{
+  "recommendations": [
+    {
+      "id": "product_id_from_catalog",
+      "aiReasonEn": "Why recommended in English",
+      "aiReasonBn": "Why recommended in Bangla"
+    }
+  ]
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              recommendations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    aiReasonEn: { type: Type.STRING },
+                    aiReasonBn: { type: Type.STRING }
+                  },
+                  required: ["id", "aiReasonEn", "aiReasonBn"]
+                }
+              }
+            },
+            required: ["recommendations"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || "{}");
+      const recommendedList = data.recommendations || [];
+
+      // Map back to full product details
+      const result = recommendedList
+        .map((rec: any) => {
+          const prod = backendProducts.find(p => String(p.id) === String(rec.id));
+          if (prod) {
+            return {
+              ...prod,
+              aiReasonEn: rec.aiReasonEn,
+              aiReasonBn: rec.aiReasonBn
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      // If we don't have enough results, pad them
+      if (result.length < 3) {
+        const existingIds = result.map(r => String(r?.id));
+        const padItems = otherProducts
+          .filter(p => !existingIds.includes(String(p.id)))
+          .slice(0, 3 - result.length)
+          .map(p => ({
+            ...p,
+            aiReasonEn: "Customers also viewed this premium item",
+            aiReasonBn: "অন্যান্য ক্রেতারা এই প্রিমিয়াম পণ্যটিও দেখেছেন"
+          }));
+        result.push(...padItems);
+      }
+
+      return res.json({ success: true, recommendations: result });
+    } catch (err) {
+      console.error("Gemini Recommendations failed, using fallback:", err);
+    }
+  }
+
+  // Fallback: rule-based category/popular recommendations
+  const fallbackRecs = otherProducts
+    .filter(p => p.category === currentProduct.category)
+    .slice(0, 3);
+  
+  if (fallbackRecs.length < 3) {
+    const padCount = 3 - fallbackRecs.length;
+    const fallbackIds = fallbackRecs.map(f => String(f.id));
+    const padItems = otherProducts
+      .filter(p => !fallbackIds.includes(String(p.id)))
+      .slice(0, padCount);
+    fallbackRecs.push(...padItems);
+  }
+
+  const resultFallback = fallbackRecs.map(p => ({
+    ...p,
+    aiReasonEn: "Similar Category Recommendation",
+    aiReasonBn: "একই ক্যাটাগরির দারুণ পণ্য"
+  }));
+
+  res.json({ success: true, recommendations: resultFallback });
+});
+
+// 2. AI-Powered Semantic Search API (Spell correction & context mapping)
+app.get("/api/ai/search", async (req, res) => {
+  const { q } = req.query;
+  const searchStr = q ? String(q).trim() : "";
+
+  if (!searchStr) {
+    return res.json({ success: true, products: backendProducts });
+  }
+
+  if (ai) {
+    try {
+      const prompt = `You are a search query semantic analyzer and spell-corrector for an online store in Bangladesh.
+The user search query is: "${searchStr}"
+
+Here is the store's full database of products:
+${backendProducts.map(p => `- ID: ${p.id} | Name: ${p.name} | Bangla Name: ${p.banglaName || ""} | Category: ${p.category} | Keywords: ${p.description}`).join("\n")}
+
+Determine which products the user is searching for, correcting typos (e.g. "tshrt" -> "T-Shirt", "punjabi" -> "Panjabi", "serum" -> "Face Serum", "valet" -> "Wallet", etc.) and matching semantic intent (e.g., "winter" -> clothing/tea, "beauty" -> serum, "presents" -> wallets/watches/panjabi).
+
+Return the recommended product IDs sorted by relevance in strict JSON format.
+
+JSON schema to follow:
+{
+  "matchedIds": ["id1", "id2"]
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              matchedIds: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            },
+            required: ["matchedIds"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || "{}");
+      const matchedIds = data.matchedIds || [];
+
+      // Filter and sort products based on returned matchedIds
+      let matchedProducts = matchedIds
+        .map((id: any) => backendProducts.find(p => String(p.id) === String(id)))
+        .filter(Boolean);
+
+      // If no AI matches, fall back to our advanced text matching
+      if (matchedProducts.length === 0) {
+        matchedProducts = backendProducts.filter(p => 
+          p.name.toLowerCase().includes(searchStr.toLowerCase()) ||
+          (p.banglaName && p.banglaName.toLowerCase().includes(searchStr.toLowerCase())) ||
+          p.category.toLowerCase().includes(searchStr.toLowerCase()) ||
+          p.description.toLowerCase().includes(searchStr.toLowerCase())
+        );
+      }
+
+      return res.json({ success: true, products: matchedProducts, method: "semantic" });
+    } catch (err) {
+      console.error("Gemini Semantic Search failed, falling back:", err);
+    }
+  }
+
+  // Simple text search fallback
+  const matchedProducts = backendProducts.filter(p => 
+    p.name.toLowerCase().includes(searchStr.toLowerCase()) ||
+    (p.banglaName && p.banglaName.toLowerCase().includes(searchStr.toLowerCase())) ||
+    p.category.toLowerCase().includes(searchStr.toLowerCase()) ||
+    p.description.toLowerCase().includes(searchStr.toLowerCase())
+  );
+
+  res.json({ success: true, products: matchedProducts, method: "text-fallback" });
+});
+
+// 3. AI-Powered Product Copywriting API
+app.post("/api/ai/copywrite", async (req, res) => {
+  const { name, category, price } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: "Product name is required" });
+  }
+
+  if (ai) {
+    try {
+      const prompt = `You are an expert e-commerce copywriter specializing in SEO-friendly, high-conversion product descriptions for the Bangladeshi market.
+Create a premium product description and landing page description for:
+- Product Name: ${name}
+- Category: ${category || "General"}
+- Price: ${price ? price + " BDT" : "Varies"}
+
+Provide descriptions in BOTH English and Bangla (Bengali).
+Keep descriptions highly engaging, detailing key benefits, premium feel, and appealing directly to online shoppers in Bangladesh.
+
+Return the response in strict JSON format.
+
+JSON schema to follow:
+{
+  "descriptionEn": "Catchy 2-3 sentence product description in English",
+  "descriptionBn": "Catchy 2-3 sentence product description in Bangla",
+  "landingDescriptionEn": "Detailed, rich SEO-friendly landing page text in English (paragraphs and highlights)",
+  "landingDescriptionBn": "Detailed, rich SEO-friendly landing page text in Bangla (paragraphs and highlights)"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              descriptionEn: { type: Type.STRING },
+              descriptionBn: { type: Type.STRING },
+              landingDescriptionEn: { type: Type.STRING },
+              landingDescriptionBn: { type: Type.STRING }
+            },
+            required: ["descriptionEn", "descriptionBn", "landingDescriptionEn", "landingDescriptionBn"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || "{}");
+      return res.json({ success: true, ...data });
+    } catch (err: any) {
+      console.error("Gemini copywriting failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to generate copy" });
+    }
+  }
+
+  // Fallback copy if Gemini is not ready
+  res.json({
+    success: true,
+    descriptionEn: `Introducing the premium ${name}. Designed for style, convenience, and superior performance. Buy now with Cash on Delivery across Bangladesh!`,
+    descriptionBn: `পেশ করছি প্রিমিয়াম কোয়ালিটির ${name}। এটি আপনার দৈনন্দিন জীবনে যোগ করবে আভিজাত্য এবং সর্বোচ্চ আরামদায়ক অভিজ্ঞতা। ক্যাশ অন ডেলিভারিতে অর্ডার করুন আজই!`,
+    landingDescriptionEn: `Discover the ultimate premium ${name}. Handcrafted and carefully curated to ensure the finest quality for online shoppers. Featuring high durability, exceptional design aesthetics, and great value for money. Order now to get fast home delivery and live order tracking.`,
+    landingDescriptionBn: `উপভোগ করুন সম্পূর্ণ অরিজিনাল এবং প্রিমিয়াম কোয়ালিটির ${name}। আমাদের প্রতিটি পণ্য ক্রেতাদের সর্বোচ্চ সন্তুষ্টি নিশ্চিত করতে বিশেষভাবে বাছাই করা হয়। আকর্ষণীয় ডিজাইন এবং দীর্ঘস্থায়িত্বের নিশ্চয়তাসহ আজই অর্ডার করুন। সারা বাংলাদেশে ৩-৫ দিনে হোম ডেলিভারি এবং লাইভ ট্র্যাকিং সুবিধা!`
+  });
 });
 
 // 1. Advanced Product Filter & Smart Search API

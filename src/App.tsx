@@ -361,6 +361,37 @@ export default function App() {
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // AI Semantic Search States & Logic
+  const [semanticSearchResults, setSemanticSearchResults] = useState<Product[] | null>(null);
+  const [isSemanticSearching, setIsSemanticSearching] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSemanticSearchResults(null);
+      return;
+    }
+
+    const delayDebounce = setTimeout(() => {
+      setIsSemanticSearching(true);
+      fetch(`/api/ai/search?q=${encodeURIComponent(searchQuery)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.products) {
+            setSemanticSearchResults(data.products);
+          }
+        })
+        .catch(err => {
+          console.error("AI Semantic search failed:", err);
+        })
+        .finally(() => {
+          setIsSemanticSearching(false);
+        });
+    }, 450); // 450ms debounce
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
   const [selectedProductDetails, setSelectedProductDetails] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
@@ -781,14 +812,17 @@ export default function App() {
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
-    const result = products.filter((p) => {
+    const sourceProducts = semanticSearchResults !== null ? semanticSearchResults : products;
+    const result = sourceProducts.filter((p) => {
       const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
       
       const term = searchQuery.toLowerCase();
-      const matchesSearch = 
+      // If we are using semantic search results, we don't need secondary text filter because AI already filtered it!
+      const matchesSearch = semanticSearchResults !== null ? true : (
         p.name.toLowerCase().includes(term) || 
         (p.banglaName && p.banglaName.toLowerCase().includes(term)) ||
-        p.category.toLowerCase().includes(term);
+        p.category.toLowerCase().includes(term)
+      );
 
       const activePrice = p.isFlashSale && p.flashSalePrice ? p.flashSalePrice : p.price;
       const matchesPrice = activePrice >= filters.priceMin && activePrice <= filters.priceMax;
@@ -824,7 +858,7 @@ export default function App() {
       // default: popularity / salesCount desc
       return [...result].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
     }
-  }, [products, selectedCategory, searchQuery, filters]);
+  }, [products, selectedCategory, searchQuery, filters, semanticSearchResults]);
 
   // Order submission
   const handlePlaceOrder = (e: React.FormEvent) => {
@@ -1753,6 +1787,31 @@ export default function App() {
 
               {/* Catalog Product Grid Container */}
               <div className="flex-1 w-full space-y-4">
+                
+                {/* AI Semantic Search Status Banner */}
+                {searchQuery.trim() && (
+                  <div className="bg-gradient-to-r from-indigo-50/50 to-purple-50/50 border border-indigo-100 rounded-2xl p-3.5 flex items-center justify-between gap-3 animate-fade-in">
+                    <div className="flex items-center gap-2.5">
+                      <div className="bg-white p-1.5 rounded-xl shadow-xs border border-indigo-100">
+                        <span className="text-sm shrink-0">🤖</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold text-[#3730a3] tracking-tight">
+                          {lang === "bn" ? `"${searchQuery}" এর জন্য জেমিনি এআই সার্চ` : `AI Semantic Search for "${searchQuery}"`}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {isSemanticSearching 
+                            ? (lang === "bn" ? "বানান ভুল সংশোধন করে সঠিক পণ্য খোঁজা হচ্ছে..." : "Gemini is correcting typos and interpreting semantic intent...") 
+                            : (lang === "bn" ? "শব্দার্থ ও বানান বিশ্লেষণ সফলভাবে সম্পন্ন হয়েছে (Gemini v3.5-Flash)" : "Typo correction and semantic mapping completed via Gemini v3.5-Flash")}
+                        </p>
+                      </div>
+                    </div>
+                    {isSemanticSearching && (
+                      <div className="w-4 h-4 border-2 border-[#3730a3] border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                  </div>
+                )}
+
                 {/* Mobile Filter Button and active count */}
                 <div className="flex items-center justify-between gap-3 md:hidden">
                   <button
@@ -2084,6 +2143,7 @@ export default function App() {
           wishlistIds={wishlist}
           onToggleWishlist={handleToggleWishlist}
           whatsappNumber={whatsappNumber}
+          onSelectProduct={(p) => setSelectedProductDetails(p)}
         />
       )}
 

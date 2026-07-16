@@ -11,6 +11,7 @@ interface ProductDetailsProps {
   wishlistIds: string[];
   onToggleWishlist: (product: Product) => void;
   whatsappNumber?: string;
+  onSelectProduct?: (product: Product) => void;
 }
 
 export default function ProductDetails({
@@ -21,10 +22,63 @@ export default function ProductDetails({
   onOrderNow,
   wishlistIds,
   onToggleWishlist,
-  whatsappNumber = "8801795339373"
+  whatsappNumber = "8801795339373",
+  onSelectProduct
 }: ProductDetailsProps) {
   // Gallery active image state
   const [activeImage, setActiveImage] = useState<string>(product.image);
+
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recsLoading, setRecsLoading] = useState<boolean>(false);
+
+  // Fetch AI Recommendations based on viewing behavior
+  useEffect(() => {
+    if (!product) return;
+
+    // Save current product view to history
+    try {
+      const viewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+      const filtered = viewed.filter((id: any) => String(id) !== String(product.id));
+      const updated = [product.id, ...filtered].slice(0, 5);
+      localStorage.setItem("recentlyViewed", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Local storage viewed history error:", e);
+    }
+
+    // Prepare browsing & purchase variables
+    let recentlyViewed: string[] = [];
+    let purchasedIds: string[] = [];
+    try {
+      recentlyViewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+      purchasedIds = JSON.parse(localStorage.getItem("purchasedProductIds") || "[]");
+    } catch (e) {
+      console.error("Local storage retrieve history error:", e);
+    }
+
+    setRecsLoading(true);
+    fetch("/api/ai/recommendations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        productId: product.id,
+        recentlyViewed,
+        purchasedIds
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.recommendations) {
+          setRecommendations(data.recommendations);
+        }
+      })
+      .catch(err => {
+        console.error("AI recommendations fetching failed:", err);
+      })
+      .finally(() => {
+        setRecsLoading(false);
+      });
+  }, [product.id]);
 
   // Variation States
   const [selectedSize, setSelectedSize] = useState<string>("");
@@ -491,6 +545,95 @@ export default function ProductDetails({
               )}
             </div>
           )}
+
+          {/* AI PRODUCT RECOMMENDATIONS ("You May Also Like") */}
+          <div className="border-t border-gray-100 bg-gradient-to-b from-indigo-50/30 to-white p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="space-y-1">
+                <span className="inline-flex items-center gap-1.5 bg-indigo-100 border border-indigo-200 px-3 py-1 rounded-full text-[#3730a3] text-[10px] font-black uppercase tracking-wider">
+                  <span className="animate-pulse">✨</span> {lang === "bn" ? "অ্যামাজন-গ্রেড এআই রিকমেন্ডেশন" : "Amazon-Grade AI Personalization"}
+                </span>
+                <h4 className="text-base font-black text-gray-900 tracking-tight flex items-center gap-1.5">
+                  {lang === "bn" ? "আপনার জন্য সেরা কিছু সাজেশন" : "You May Also Like"}
+                </h4>
+                <p className="text-[11px] text-gray-500">
+                  {lang === "bn" 
+                    ? "আপনার ব্রাউজিং ও পারচেজ হিস্টোরি বিশ্লেষণ করে জেমিনি এআই-এর বিশেষ সাজেশন" 
+                    : "Highly relevant matching products personalized in real-time by Gemini AI"}
+                </p>
+              </div>
+            </div>
+
+            {recsLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="border border-gray-100 bg-white/60 rounded-2xl p-4 space-y-3 animate-pulse">
+                    <div className="bg-gray-200 h-28 w-full rounded-xl"></div>
+                    <div className="h-4 bg-gray-200 rounded-md w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded-md w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+            ) : recommendations.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {recommendations.slice(0, 3).map((rec) => {
+                  const activePrice = rec.isFlashSale && rec.flashSalePrice ? rec.flashSalePrice : rec.price;
+                  return (
+                    <div 
+                      key={rec.id}
+                      onClick={() => onSelectProduct && onSelectProduct(rec)}
+                      className="group border border-gray-100 bg-white hover:border-indigo-200 rounded-2xl p-3.5 space-y-3 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between"
+                    >
+                      <div className="space-y-2.5">
+                        {/* Image */}
+                        <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-50 border border-gray-50">
+                          <img 
+                            src={rec.image} 
+                            alt={rec.name} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            referrerPolicy="no-referrer"
+                          />
+                          {rec.isFlashSale && (
+                            <span className="absolute top-2 left-2 bg-red-500 text-white font-black text-[9px] px-2 py-0.5 rounded-md uppercase tracking-wide">
+                              SALE
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Text */}
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-bold text-[#3730a3] uppercase tracking-wide">{rec.category}</p>
+                          <h5 className="font-extrabold text-gray-800 text-xs sm:text-sm line-clamp-1 group-hover:text-[#3730a3] transition-colors">
+                            {lang === "bn" ? rec.banglaName || rec.name : rec.name}
+                          </h5>
+                          
+                          {/* Price */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs sm:text-sm font-black text-[#3730a3]">৳{activePrice}</span>
+                            {rec.isFlashSale && (
+                              <span className="text-[10px] text-gray-400 line-through">৳{rec.price}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* AI Reason Badge */}
+                      <div className="mt-3 pt-2.5 border-t border-indigo-50/60 text-[10px] font-semibold text-indigo-700/90 flex items-start gap-1">
+                        <span className="text-xs shrink-0">💡</span>
+                        <span className="line-clamp-2">
+                          {lang === "bn" 
+                            ? rec.aiReasonBn || "আপনার পছন্দ হতে পারে এমন একটি সেরা কালেকশন!" 
+                            : rec.aiReasonEn || "Curated recommendation chosen just for you"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-4">No suggestions available</p>
+            )}
+          </div>
 
         </div>
       </div>
