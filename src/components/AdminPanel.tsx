@@ -3,6 +3,7 @@ import { Product, Order, OrderStatus, Coupon } from "../types";
 import { createDefaultTrackingHistory, updateTrackingHistory } from "../data";
 import watchBannerImg from "../assets/images/watch_banner_1784030925146.jpg";
 import FacebookAdPreview from "./FacebookAdPreview";
+import TikTokAdPreview from "./TikTokAdPreview";
 import { 
   DollarSign, Package, ShoppingBag, TrendingUp, Edit3, Trash2, Plus, 
   X, Check, AlertCircle, ShoppingCart, Upload, Facebook, Code, ExternalLink, Copy, Share2,
@@ -67,6 +68,7 @@ export default function AdminPanel({
     | "campaign";
 
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
+  const [campaignPlatform, setCampaignPlatform] = useState<"facebook" | "tiktok">("facebook");
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState<boolean>(false);
   const [orderSearchQuery, setOrderSearchQuery] = useState<string>("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
@@ -508,7 +510,7 @@ export default function AdminPanel({
     { id: "customers", labelBn: "গ্রাহক তালিকা", labelEn: "Customers", icon: Users },
     { id: "accounts", labelBn: "হিসাব-নিকাশ", labelEn: "Accounts", icon: CreditCard },
     { id: "coupons", labelBn: "কুপন ও ডিসকাউন্ট", labelEn: "Coupons", icon: Percent },
-    { id: "campaign", labelBn: "ফেসবুক অ্যাড মেকার", labelEn: "FB Ad Maker", icon: Facebook },
+    { id: "campaign", labelBn: "অ্যাড মেকার (FB & TikTok)", labelEn: "Ad Maker (FB/TikTok)", icon: Sparkles },
     { id: "products", labelBn: "প্রোডাক্ট ম্যানেজার", labelEn: "Products", icon: Package },
     { id: "categories", labelBn: "ক্যাটাগরি", labelEn: "Categories", icon: Layers },
     { id: "authors", labelBn: "লেখকবৃন্দ", labelEn: "Authors", icon: Feather },
@@ -4324,8 +4326,42 @@ export default function AdminPanel({
 
       {/* RENDER CAMPAIGN */}
       {activeTab === "campaign" && (
-        <div className="space-y-6 animate-fade-in animate-duration-200 bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
-          <FacebookAdPreview products={products} lang={lang} />
+        <div className="space-y-6 animate-fade-in animate-duration-200">
+          {/* Platform Tab Selector */}
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2 w-full max-w-sm mx-auto border border-gray-200/50">
+            <button
+              type="button"
+              onClick={() => setCampaignPlatform("facebook")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                campaignPlatform === "facebook"
+                  ? "bg-white text-[#3730a3] shadow-xs border border-gray-150"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <Facebook className="w-4 h-4 text-[#1877F2]" />
+              {lang === "bn" ? "ফেসবুক" : "Facebook Ads"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCampaignPlatform("tiktok")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                campaignPlatform === "tiktok"
+                  ? "bg-slate-900 text-white shadow-xs border border-slate-800"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <span className="text-[14px]">𝅘𝅥𝅮</span>
+              {lang === "bn" ? "টিকটক" : "TikTok Creator"}
+            </button>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+            {campaignPlatform === "facebook" ? (
+              <FacebookAdPreview products={products} lang={lang} />
+            ) : (
+              <TikTokAdPreview products={products} lang={lang} />
+            )}
+          </div>
         </div>
       )}
 
