@@ -489,6 +489,233 @@ Ensure the style is extremely professional, friendly, and culturally relevant to
     });
   }
 });
+app.post("/api/ai/recommendations", async (req, res) => {
+  const { productId, recentlyViewed = [], purchasedIds = [] } = req.body;
+  const currentProduct = backendProducts.find((p) => String(p.id) === String(productId));
+  if (!currentProduct) {
+    return res.json({
+      success: true,
+      recommendations: backendProducts.slice(0, 3).map((p) => ({
+        ...p,
+        aiReasonEn: "Popular Collection",
+        aiReasonBn: "\u099C\u09A8\u09AA\u09CD\u09B0\u09BF\u09DF \u0995\u09BE\u09B2\u09C7\u0995\u09B6\u09A8"
+      }))
+    });
+  }
+  const otherProducts = backendProducts.filter((p) => String(p.id) !== String(currentProduct.id));
+  if (ai) {
+    try {
+      const prompt = `You are an AI-powered Amazon-style personalization and product recommendation engine for a premium Bangladeshi e-commerce store.
+Analyze the user's shopping context and recommend the top 3 best matching/complementary products from the available catalog.
+
+Currently viewed product:
+- Name: ${currentProduct.name}
+- Category: ${currentProduct.category}
+- Description: ${currentProduct.description}
+- Price: ${currentProduct.price} BDT
+
+User's browsing/purchasing history:
+- Recently Viewed IDs: ${recentlyViewed.join(", ")}
+- Already Purchased IDs: ${purchasedIds.join(", ")}
+
+Available Catalog (choose EXACTLY 3-4 from these):
+${otherProducts.map((p) => `- ID: ${p.id} | Name: ${p.name} | Category: ${p.category} | Price: ${p.price} BDT | Description: ${p.description}`).join("\n")}
+
+Rules:
+1. Choose exactly 3 or 4 products from the available catalog that are most relevant (cross-selling, upselling, complementary, same category, or stylistic matches).
+2. For each recommendation, provide a short, catchy explanation of why it was recommended (e.g. "Complete your look", "Frequently bought together", "Premium upgrade", "Perfect accessory") in English and also in Bangla.
+3. Return the response in strict JSON format.
+
+JSON schema to follow:
+{
+  "recommendations": [
+    {
+      "id": "product_id_from_catalog",
+      "aiReasonEn": "Why recommended in English",
+      "aiReasonBn": "Why recommended in Bangla"
+    }
+  ]
+}`;
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: import_genai.Type.OBJECT,
+            properties: {
+              recommendations: {
+                type: import_genai.Type.ARRAY,
+                items: {
+                  type: import_genai.Type.OBJECT,
+                  properties: {
+                    id: { type: import_genai.Type.STRING },
+                    aiReasonEn: { type: import_genai.Type.STRING },
+                    aiReasonBn: { type: import_genai.Type.STRING }
+                  },
+                  required: ["id", "aiReasonEn", "aiReasonBn"]
+                }
+              }
+            },
+            required: ["recommendations"]
+          }
+        }
+      });
+      const data = JSON.parse(response.text || "{}");
+      const recommendedList = data.recommendations || [];
+      const result = recommendedList.map((rec) => {
+        const prod = backendProducts.find((p) => String(p.id) === String(rec.id));
+        if (prod) {
+          return {
+            ...prod,
+            aiReasonEn: rec.aiReasonEn,
+            aiReasonBn: rec.aiReasonBn
+          };
+        }
+        return null;
+      }).filter(Boolean);
+      if (result.length < 3) {
+        const existingIds = result.map((r) => String(r?.id));
+        const padItems = otherProducts.filter((p) => !existingIds.includes(String(p.id))).slice(0, 3 - result.length).map((p) => ({
+          ...p,
+          aiReasonEn: "Customers also viewed this premium item",
+          aiReasonBn: "\u0985\u09A8\u09CD\u09AF\u09BE\u09A8\u09CD\u09AF \u0995\u09CD\u09B0\u09C7\u09A4\u09BE\u09B0\u09BE \u098F\u0987 \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09AF\u09BC\u09BE\u09AE \u09AA\u09A3\u09CD\u09AF\u099F\u09BF\u0993 \u09A6\u09C7\u0996\u09C7\u099B\u09C7\u09A8"
+        }));
+        result.push(...padItems);
+      }
+      return res.json({ success: true, recommendations: result });
+    } catch (err) {
+      console.error("Gemini Recommendations failed, using fallback:", err);
+    }
+  }
+  const fallbackRecs = otherProducts.filter((p) => p.category === currentProduct.category).slice(0, 3);
+  if (fallbackRecs.length < 3) {
+    const padCount = 3 - fallbackRecs.length;
+    const fallbackIds = fallbackRecs.map((f) => String(f.id));
+    const padItems = otherProducts.filter((p) => !fallbackIds.includes(String(p.id))).slice(0, padCount);
+    fallbackRecs.push(...padItems);
+  }
+  const resultFallback = fallbackRecs.map((p) => ({
+    ...p,
+    aiReasonEn: "Similar Category Recommendation",
+    aiReasonBn: "\u098F\u0995\u0987 \u0995\u09CD\u09AF\u09BE\u099F\u09BE\u0997\u09B0\u09BF\u09B0 \u09A6\u09BE\u09B0\u09C1\u09A3 \u09AA\u09A3\u09CD\u09AF"
+  }));
+  res.json({ success: true, recommendations: resultFallback });
+});
+app.get("/api/ai/search", async (req, res) => {
+  const { q } = req.query;
+  const searchStr = q ? String(q).trim() : "";
+  if (!searchStr) {
+    return res.json({ success: true, products: backendProducts });
+  }
+  if (ai) {
+    try {
+      const prompt = `You are a search query semantic analyzer and spell-corrector for an online store in Bangladesh.
+The user search query is: "${searchStr}"
+
+Here is the store's full database of products:
+${backendProducts.map((p) => `- ID: ${p.id} | Name: ${p.name} | Bangla Name: ${p.banglaName || ""} | Category: ${p.category} | Keywords: ${p.description}`).join("\n")}
+
+Determine which products the user is searching for, correcting typos (e.g. "tshrt" -> "T-Shirt", "punjabi" -> "Panjabi", "serum" -> "Face Serum", "valet" -> "Wallet", etc.) and matching semantic intent (e.g., "winter" -> clothing/tea, "beauty" -> serum, "presents" -> wallets/watches/panjabi).
+
+Return the recommended product IDs sorted by relevance in strict JSON format.
+
+JSON schema to follow:
+{
+  "matchedIds": ["id1", "id2"]
+}`;
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: import_genai.Type.OBJECT,
+            properties: {
+              matchedIds: {
+                type: import_genai.Type.ARRAY,
+                items: { type: import_genai.Type.STRING }
+              }
+            },
+            required: ["matchedIds"]
+          }
+        }
+      });
+      const data = JSON.parse(response.text || "{}");
+      const matchedIds = data.matchedIds || [];
+      let matchedProducts2 = matchedIds.map((id) => backendProducts.find((p) => String(p.id) === String(id))).filter(Boolean);
+      if (matchedProducts2.length === 0) {
+        matchedProducts2 = backendProducts.filter(
+          (p) => p.name.toLowerCase().includes(searchStr.toLowerCase()) || p.banglaName && p.banglaName.toLowerCase().includes(searchStr.toLowerCase()) || p.category.toLowerCase().includes(searchStr.toLowerCase()) || p.description.toLowerCase().includes(searchStr.toLowerCase())
+        );
+      }
+      return res.json({ success: true, products: matchedProducts2, method: "semantic" });
+    } catch (err) {
+      console.error("Gemini Semantic Search failed, falling back:", err);
+    }
+  }
+  const matchedProducts = backendProducts.filter(
+    (p) => p.name.toLowerCase().includes(searchStr.toLowerCase()) || p.banglaName && p.banglaName.toLowerCase().includes(searchStr.toLowerCase()) || p.category.toLowerCase().includes(searchStr.toLowerCase()) || p.description.toLowerCase().includes(searchStr.toLowerCase())
+  );
+  res.json({ success: true, products: matchedProducts, method: "text-fallback" });
+});
+app.post("/api/ai/copywrite", async (req, res) => {
+  const { name, category, price } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: "Product name is required" });
+  }
+  if (ai) {
+    try {
+      const prompt = `You are an expert e-commerce copywriter specializing in SEO-friendly, high-conversion product descriptions for the Bangladeshi market.
+Create a premium product description and landing page description for:
+- Product Name: ${name}
+- Category: ${category || "General"}
+- Price: ${price ? price + " BDT" : "Varies"}
+
+Provide descriptions in BOTH English and Bangla (Bengali).
+Keep descriptions highly engaging, detailing key benefits, premium feel, and appealing directly to online shoppers in Bangladesh.
+
+Return the response in strict JSON format.
+
+JSON schema to follow:
+{
+  "descriptionEn": "Catchy 2-3 sentence product description in English",
+  "descriptionBn": "Catchy 2-3 sentence product description in Bangla",
+  "landingDescriptionEn": "Detailed, rich SEO-friendly landing page text in English (paragraphs and highlights)",
+  "landingDescriptionBn": "Detailed, rich SEO-friendly landing page text in Bangla (paragraphs and highlights)"
+}`;
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: import_genai.Type.OBJECT,
+            properties: {
+              descriptionEn: { type: import_genai.Type.STRING },
+              descriptionBn: { type: import_genai.Type.STRING },
+              landingDescriptionEn: { type: import_genai.Type.STRING },
+              landingDescriptionBn: { type: import_genai.Type.STRING }
+            },
+            required: ["descriptionEn", "descriptionBn", "landingDescriptionEn", "landingDescriptionBn"]
+          }
+        }
+      });
+      const data = JSON.parse(response.text || "{}");
+      return res.json({ success: true, ...data });
+    } catch (err) {
+      console.error("Gemini copywriting failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to generate copy" });
+    }
+  }
+  res.json({
+    success: true,
+    descriptionEn: `Introducing the premium ${name}. Designed for style, convenience, and superior performance. Buy now with Cash on Delivery across Bangladesh!`,
+    descriptionBn: `\u09AA\u09C7\u09B6 \u0995\u09B0\u099B\u09BF \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09DF\u09BE\u09AE \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF\u09B0 ${name}\u0964 \u098F\u099F\u09BF \u0986\u09AA\u09A8\u09BE\u09B0 \u09A6\u09C8\u09A8\u09A8\u09CD\u09A6\u09BF\u09A8 \u099C\u09C0\u09AC\u09A8\u09C7 \u09AF\u09CB\u0997 \u0995\u09B0\u09AC\u09C7 \u0986\u09AD\u09BF\u099C\u09BE\u09A4\u09CD\u09AF \u098F\u09AC\u0982 \u09B8\u09B0\u09CD\u09AC\u09CB\u099A\u09CD\u099A \u0986\u09B0\u09BE\u09AE\u09A6\u09BE\u09DF\u0995 \u0985\u09AD\u09BF\u099C\u09CD\u099E\u09A4\u09BE\u0964 \u0995\u09CD\u09AF\u09BE\u09B6 \u0985\u09A8 \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF\u09A4\u09C7 \u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u0995\u09B0\u09C1\u09A8 \u0986\u099C\u0987!`,
+    landingDescriptionEn: `Discover the ultimate premium ${name}. Handcrafted and carefully curated to ensure the finest quality for online shoppers. Featuring high durability, exceptional design aesthetics, and great value for money. Order now to get fast home delivery and live order tracking.`,
+    landingDescriptionBn: `\u0989\u09AA\u09AD\u09CB\u0997 \u0995\u09B0\u09C1\u09A8 \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u0985\u09B0\u09BF\u099C\u09BF\u09A8\u09BE\u09B2 \u098F\u09AC\u0982 \u09AA\u09CD\u09B0\u09BF\u09AE\u09BF\u09DF\u09BE\u09AE \u0995\u09CB\u09DF\u09BE\u09B2\u09BF\u099F\u09BF\u09B0 ${name}\u0964 \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BF \u09AA\u09A3\u09CD\u09AF \u0995\u09CD\u09B0\u09C7\u09A4\u09BE\u09A6\u09C7\u09B0 \u09B8\u09B0\u09CD\u09AC\u09CB\u099A\u09CD\u099A \u09B8\u09A8\u09CD\u09A4\u09C1\u09B7\u09CD\u099F\u09BF \u09A8\u09BF\u09B6\u09CD\u099A\u09BF\u09A4 \u0995\u09B0\u09A4\u09C7 \u09AC\u09BF\u09B6\u09C7\u09B7\u09AD\u09BE\u09AC\u09C7 \u09AC\u09BE\u099B\u09BE\u0987 \u0995\u09B0\u09BE \u09B9\u09DF\u0964 \u0986\u0995\u09B0\u09CD\u09B7\u09A3\u09C0\u09DF \u09A1\u09BF\u099C\u09BE\u0987\u09A8 \u098F\u09AC\u0982 \u09A6\u09C0\u09B0\u09CD\u0998\u09B8\u09CD\u09A5\u09BE\u09DF\u09BF\u09A4\u09CD\u09AC\u09C7\u09B0 \u09A8\u09BF\u09B6\u09CD\u099A\u09DF\u09A4\u09BE\u09B8\u09B9 \u0986\u099C\u0987 \u0985\u09B0\u09CD\u09A1\u09BE\u09B0 \u0995\u09B0\u09C1\u09A8\u0964 \u09B8\u09BE\u09B0\u09BE \u09AC\u09BE\u0982\u09B2\u09BE\u09A6\u09C7\u09B6\u09C7 \u09E9-\u09EB \u09A6\u09BF\u09A8\u09C7 \u09B9\u09CB\u09AE \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF \u098F\u09AC\u0982 \u09B2\u09BE\u0987\u09AD \u099F\u09CD\u09B0\u09CD\u09AF\u09BE\u0995\u09BF\u0982 \u09B8\u09C1\u09AC\u09BF\u09A7\u09BE!`
+  });
+});
 app.get("/api/products/search", (req, res) => {
   const { q, category, priceMin, priceMax, minRating, stockStatus, sortBy } = req.query;
   let result = [...backendProducts];
