@@ -2604,24 +2604,6 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Email (Optional) */}
-                  <div className="space-y-1">
-                    <label className="text-gray-500 font-bold block flex items-center justify-between">
-                      <span>{lang === "bn" ? "ইমেইল ঠিকানা (ঐচ্ছিক)" : "Email Address (Optional)"}</span>
-                      <span className="text-[9px] text-[#3730a3] font-extrabold bg-indigo-50 px-1.5 py-0.5 rounded-full">
-                        {lang === "bn" ? "ফ্রি অর্ডার রিসিট" : "Free Order Receipt"}
-                      </span>
-                    </label>
-                    <input
-                      id="checkout-email-input"
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#3730a3] focus:bg-white transition-all"
-                      placeholder={lang === "bn" ? "যেমনঃ client@domain.com" : "e.g. buyer@example.com"}
-                    />
-                  </div>
-
                   {/* division, district, thana grid */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">

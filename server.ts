@@ -24,12 +24,12 @@ interface ConfigKeys {
 function getApiKeys(): Required<ConfigKeys> {
   const defaultKeys = {
     brevoApiKey: process.env.BREVO_API_KEY || "",
-    brevoSenderEmail: process.env.BREVO_SENDER_EMAIL || "tanjim7862@gmail.com",
-    brevoSenderName: process.env.BREVO_SENDER_NAME || "JOHURUL BDShop",
+    brevoSenderEmail: process.env.BREVO_SENDER_EMAIL || "",
+    brevoSenderName: process.env.BREVO_SENDER_NAME || "",
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
     cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
     cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
-    cloudinaryUploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || "ml_default",
+    cloudinaryUploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || "",
   };
 
   try {
