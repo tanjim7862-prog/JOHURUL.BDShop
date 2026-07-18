@@ -84,4 +84,5 @@ export interface Order {
   trackingHistory: TrackingStep[];
   createdAt: string;
   fbCampaignRef?: string;
+  customerEmail?: string;
 }

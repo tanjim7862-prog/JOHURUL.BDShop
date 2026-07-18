@@ -5,11 +5,67 @@ import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { INITIAL_PRODUCTS, createDefaultTrackingHistory } from "./src/data";
 import { Product, Order, OrderStatus, Coupon } from "./src/types";
+import crypto from "crypto";
 
-dotenv.config();
+dotenv.config({ override: true });
+
+import fs from "fs";
+
+interface ConfigKeys {
+  brevoApiKey?: string;
+  brevoSenderEmail?: string;
+  brevoSenderName?: string;
+  cloudinaryCloudName?: string;
+  cloudinaryApiKey?: string;
+  cloudinaryApiSecret?: string;
+  cloudinaryUploadPreset?: string;
+}
+
+function getApiKeys(): Required<ConfigKeys> {
+  const defaultKeys = {
+    brevoApiKey: process.env.BREVO_API_KEY || "",
+    brevoSenderEmail: process.env.BREVO_SENDER_EMAIL || "tanjim7862@gmail.com",
+    brevoSenderName: process.env.BREVO_SENDER_NAME || "JOHURUL BDShop",
+    cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+    cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
+    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+    cloudinaryUploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || "ml_default",
+  };
+
+  try {
+    if (fs.existsSync("./keys-config.json")) {
+      const saved = JSON.parse(fs.readFileSync("./keys-config.json", "utf8"));
+      return {
+        brevoApiKey: saved.brevoApiKey || defaultKeys.brevoApiKey,
+        brevoSenderEmail: saved.brevoSenderEmail || defaultKeys.brevoSenderEmail,
+        brevoSenderName: saved.brevoSenderName || defaultKeys.brevoSenderName,
+        cloudinaryCloudName: saved.cloudinaryCloudName || defaultKeys.cloudinaryCloudName,
+        cloudinaryApiKey: saved.cloudinaryApiKey || defaultKeys.cloudinaryApiKey,
+        cloudinaryApiSecret: saved.cloudinaryApiSecret || defaultKeys.cloudinaryApiSecret,
+        cloudinaryUploadPreset: saved.cloudinaryUploadPreset || defaultKeys.cloudinaryUploadPreset,
+      };
+    }
+  } catch (err) {
+    console.error("Error reading keys-config.json:", err);
+  }
+  return defaultKeys;
+}
+
+function saveApiKeys(keys: ConfigKeys) {
+  try {
+    const current = getApiKeys();
+    const updated = { ...current, ...keys };
+    fs.writeFileSync("./keys-config.json", JSON.stringify(updated, null, 2), "utf8");
+    return true;
+  } catch (err) {
+    console.error("Error saving keys-config.json:", err);
+    return false;
+  }
+}
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // In-Memory Database for backend processing
 let backendProducts: Product[] = [...INITIAL_PRODUCTS];
@@ -46,6 +102,9 @@ let backendCoupons: Coupon[] = [
     descriptionBn: "২০০০ টাকার বেশি অর্ডারে ২০০ টাকা ফ্ল্যাট ছাড়"
   }
 ];
+
+// Store the last Brevo API error for real-time diagnostics on the Admin Panel UI
+let lastBrevoError: string | null = null;
 
 // Let's populate some initial historical orders for beautiful, instant Admin Analytics charts
 let backendOrders: Order[] = [
@@ -621,7 +680,271 @@ app.get("/api/products/search", (req, res) => {
   });
 });
 
-// 2. Checkout & Order Submission Pipeline
+// ==========================================
+// CLOUDINARY IMAGE UPLOAD SERVICE
+// ==========================================
+app.post("/api/upload", async (req, res) => {
+  const { file } = req.body;
+  if (!file) {
+    return res.status(400).json({ error: "No image file provided" });
+  }
+
+  const keys = getApiKeys();
+  const cloudName = keys.cloudinaryCloudName;
+  const apiKey = keys.cloudinaryApiKey;
+  const apiSecret = keys.cloudinaryApiSecret;
+  const uploadPreset = keys.cloudinaryUploadPreset;
+
+  // Helper to detect placeholder credentials
+  const isPlaceholderKey = (val: string | undefined): boolean => {
+    if (!val) return true;
+    const lower = val.trim().toLowerCase();
+    return (
+      lower === "" ||
+      lower.includes("placeholder") ||
+      lower.includes("your_") ||
+      lower.includes("<your") ||
+      lower.includes("your-") ||
+      lower.includes("cloudinary_api_key") ||
+      lower.includes("cloudinary_api_secret") ||
+      lower.includes("আপনার_")
+    );
+  };
+
+  const isApiPlaceholder = isPlaceholderKey(apiKey) || isPlaceholderKey(apiSecret);
+
+  // If Cloudinary is not configured, fall back to base64 storage gracefully so the user can still use the app!
+  if (!cloudName) {
+    console.log("Cloudinary is not configured. Falling back to local Base64 storage.");
+    return res.json({
+      success: true,
+      url: file, // Keep the base64 string
+      fallback: true,
+      message: "Using local storage (Base64) because Cloudinary is not configured in your Secrets."
+    });
+  }
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append("file", file);
+
+    if (apiKey && apiSecret && !isApiPlaceholder) {
+      // Signed Upload Configuration
+      const timestamp = Math.round(new Date().getTime() / 1000).toString();
+      const signatureString = `timestamp=${timestamp}${apiSecret}`;
+      const signature = crypto.createHash("sha1").update(signatureString).digest("hex");
+
+      formData.append("api_key", apiKey);
+      formData.append("timestamp", timestamp);
+      formData.append("signature", signature);
+    } else {
+      // Unsigned Upload Configuration (Using Preset)
+      formData.append("upload_preset", uploadPreset);
+    }
+
+    console.log(`Uploading to Cloudinary [Cloud: ${cloudName}]...`);
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json() as any;
+
+    if (data && data.secure_url) {
+      console.log("Cloudinary Upload Success:", data.secure_url);
+      return res.json({
+        success: true,
+        url: data.secure_url,
+        message: "Successfully uploaded to Cloudinary!"
+      });
+    } else {
+      console.error("Cloudinary returned an error:", data);
+      return res.status(500).json({
+        error: data.error?.message || "Failed to upload to Cloudinary. Check your Cloudinary keys or Preset.",
+        fallbackUrl: file
+      });
+    }
+  } catch (err: any) {
+    console.error("Cloudinary connection error:", err);
+    return res.status(500).json({
+      error: "Cloudinary server communication failed.",
+      fallbackUrl: file
+    });
+  }
+});
+
+// 2. Checkout & Order Submission Pipeline & Brevo Mailer
+// ==========================================
+// BREVO (SENDINBLUE) EMAIL SERVICE
+// ==========================================
+async function triggerBrevoEmail(order: Order, summary: any) {
+  const keys = getApiKeys();
+  const brevoApiKey = keys.brevoApiKey;
+  const senderEmail = keys.brevoSenderEmail;
+  const senderName = keys.brevoSenderName;
+
+  if (!brevoApiKey || brevoApiKey === "আপনার_ব্রেভো_এপিআই_কি" || brevoApiKey === "আপনার_ব্রেভো_এপিআই_কি_এখানে_দিন") {
+    console.log(`[Brevo Simulation] No BREVO_API_KEY set. Order confirmation email for ${order.id} was simulated. CC Admin Alert to: ${senderEmail}`);
+    return;
+  }
+
+  const itemsHtml = order.cartItems.map(item => {
+    const prodName = item.product.banglaName || item.product.name;
+    const itemPrice = item.price || (item.product.isFlashSale && item.product.flashSalePrice ? item.product.flashSalePrice : item.product.price);
+    return `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #2d3748;">
+          <strong>${prodName}</strong>
+          ${item.selectedSize ? `<br/><span style="font-size: 12px; color: #718096;">Size: ${item.selectedSize}</span>` : ""}
+          ${item.selectedColor ? `<br/><span style="font-size: 12px; color: #718096;">Color: ${item.selectedColor}</span>` : ""}
+        </td>
+        <td style="padding: 12px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #2d3748; text-align: center;">
+          ${item.quantity}
+        </td>
+        <td style="padding: 12px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #2d3748; text-align: right; font-weight: bold;">
+          ৳${itemPrice * item.quantity}
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Order Confirmed</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+        <!-- Header banner -->
+        <div style="background-color: #3730a3; padding: 32px 24px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">🎉 Order Confirmed!</h1>
+          <p style="color: #c7d2fe; margin: 8px 0 0 0; font-size: 14px; font-weight: 500;">Thank you for shopping with ${senderName}</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 24px;">
+          <p style="font-size: 16px; color: #2d3748; margin-top: 0;">Hi <strong>${order.customerName}</strong>,</p>
+          <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">Your order has been logged in our system. Below are your purchase receipt and shipping details. You can track your shipping milestone in real-time on our website with your tracking number.</p>
+          
+          <!-- Order ID / Tracking Card -->
+          <div style="background-color: #eef2ff; border: 1px solid #e0e7ff; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+            <span style="font-size: 12px; color: #4338ca; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: block;">Tracking Number</span>
+            <strong style="font-size: 24px; color: #312e81; font-family: monospace; display: block; margin: 4px 0;">${order.id}</strong>
+            <p style="font-size: 11px; color: #6366f1; margin: 4px 0 0 0; font-weight: 600;">Use this tracking ID in our tracking panel to view live updates!</p>
+          </div>
+          
+          <!-- Product Table -->
+          <h3 style="font-size: 16px; color: #1a202c; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; margin: 24px 0 12px 0;">Order Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #f7fafc;">
+                <th style="padding: 10px; text-align: left; font-size: 12px; color: #718096; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #e2e8f0;">Item</th>
+                <th style="padding: 10px; text-align: center; font-size: 12px; color: #718096; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #e2e8f0;">Qty</th>
+                <th style="padding: 10px; text-align: right; font-size: 12px; color: #718096; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #e2e8f0;">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          
+          <!-- Pricing summary -->
+          <div style="width: 250px; margin-left: auto; margin-bottom: 24px;">
+            <table style="width: 100%; font-size: 14px;">
+              <tr>
+                <td style="padding: 4px 0; color: #718096;">Subtotal:</td>
+                <td style="padding: 4px 0; text-align: right; color: #2d3748; font-weight: 600;">৳${summary.subtotal}</td>
+              </tr>
+              ${summary.discount > 0 ? `
+              <tr>
+                <td style="padding: 4px 0; color: #4338ca;">Discount:</td>
+                <td style="padding: 4px 0; text-align: right; color: #4338ca; font-weight: 700;">-৳${summary.discount}</td>
+              </tr>` : ""}
+              <tr>
+                <td style="padding: 4px 0; color: #718096;">Shipping Fee:</td>
+                <td style="padding: 4px 0; text-align: right; color: #2d3748; font-weight: 600;">৳${summary.deliveryFee}</td>
+              </tr>
+              <tr style="border-top: 1px solid #edf2f7; font-weight: bold;">
+                <td style="padding: 8px 0 0 0; color: #1a202c; font-size: 16px;">Total Paid:</td>
+                <td style="padding: 8px 0 0 0; text-align: right; color: #3730a3; font-size: 18px;">৳${summary.total}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <!-- Delivery Details -->
+          <h3 style="font-size: 16px; color: #1a202c; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; margin: 24px 0 12px 0;">Shipping Information</h3>
+          <table style="width: 100%; font-size: 14px; border: 1px solid #edf2f7; border-radius: 8px; padding: 12px;">
+            <tr>
+              <td style="color: #718096; width: 120px; padding: 4px 0; font-weight: 600;">Customer Phone:</td>
+              <td style="color: #2d3748; padding: 4px 0;">${order.customerPhone}</td>
+            </tr>
+            <tr>
+              <td style="color: #718096; padding: 4px 0; font-weight: 600; vertical-align: top;">Address:</td>
+              <td style="color: #2d3748; padding: 4px 0; line-height: 1.4;">
+                ${order.customerAddress}, ${order.customerThana || ""}, ${order.customerDistrict}, ${order.customerDivision || ""}
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #718096; padding: 4px 0; font-weight: 600;">Payment Method:</td>
+              <td style="color: #2d3748; padding: 4px 0; text-transform: uppercase; font-weight: bold;">
+                ${order.paymentMethod === "online" ? `Online (${order.onlineGatewayType?.toUpperCase() || "Manual"})` : "Cash on Delivery"}
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background-color: #f7fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #a0aec0;">
+          <p style="margin: 0 0 8px 0;">This email was sent automatically to confirm your purchase.</p>
+          <p style="margin: 0;">&copy; 2026 ${senderName}. All Rights Reserved. Bangladesh.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Define recipients list
+  const recipients: { email: string; name?: string }[] = [];
+  if (order.customerEmail) {
+    recipients.push({ email: order.customerEmail, name: order.customerName });
+  }
+
+  // Always send a carbon copy alert to the Admin so they are notified instantly of a new sale!
+  recipients.push({ email: senderEmail, name: `Admin Alert (${senderName})` });
+
+  try {
+    console.log(`[Brevo API] Sending transactional emails via Brevo for Order ${order.id}...`);
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: recipients,
+        subject: `[JOHURUL BDShop] Order Confirmed - ${order.id} (৳${summary.total})`,
+        htmlContent: htmlContent
+      })
+    });
+
+    if (response.ok) {
+      console.log(`[Brevo API] Order confirmation email successfully sent for Order ${order.id}!`);
+      lastBrevoError = null;
+    } else {
+      const errBody = await response.text();
+      console.error(`[Brevo API Error] Failed to send email via Brevo:`, errBody);
+      lastBrevoError = errBody;
+    }
+  } catch (error: any) {
+    console.error("[Brevo API Catch Error] Failed to connect to Brevo SMTP servers:", error);
+    lastBrevoError = error.message || "Failed to connect to Brevo SMTP servers";
+  }
+}
+
 app.post("/api/checkout", (req, res) => {
   const {
     customerName,
@@ -635,7 +958,8 @@ app.post("/api/checkout", (req, res) => {
     paymentMethod = "cod",
     onlineGatewayType,
     paymentTransactionId,
-    fbCampaignRef
+    fbCampaignRef,
+    customerEmail
   } = req.body;
 
   // Basic Validation
@@ -717,11 +1041,20 @@ app.post("/api/checkout", (req, res) => {
     status: OrderStatus.RECEIVED,
     trackingHistory: createDefaultTrackingHistory(new Date()),
     createdAt: new Date().toISOString(),
-    fbCampaignRef
+    fbCampaignRef,
+    customerEmail
   };
 
   // Save to backend database
   backendOrders = [newOrder, ...backendOrders];
+
+  // Send Order Notification via Brevo (Sends email to customer if provided, and alert email to admin)
+  triggerBrevoEmail(newOrder, {
+    subtotal: cartSubtotal,
+    discount: discountAmount,
+    deliveryFee: deliveryCharge,
+    total: finalPayable
+  });
 
   res.status(201).json({
     success: true,
@@ -941,6 +1274,166 @@ Why Choose Our "${productName}"?
 🎁 Click "Shop Now" to place your order or message our page to secure yours today!`;
   }
 }
+
+// ==========================================
+// API INTEGRATION VERIFICATION ENDPOINTS
+// ==========================================
+app.get("/api/admin/verify-keys", (req, res) => {
+  const keys = getApiKeys();
+  const cloudinaryCloudName = keys.cloudinaryCloudName;
+  const cloudinaryApiKey = keys.cloudinaryApiKey;
+  const cloudinaryApiSecret = keys.cloudinaryApiSecret;
+  const cloudinaryUploadPreset = keys.cloudinaryUploadPreset;
+
+  const isPlaceholderKey = (val: string | undefined): boolean => {
+    if (!val) return true;
+    const lower = val.trim().toLowerCase();
+    return (
+      lower === "" ||
+      lower.includes("placeholder") ||
+      lower.includes("your_") ||
+      lower.includes("<your") ||
+      lower.includes("your-") ||
+      lower.includes("cloudinary_api_key") ||
+      lower.includes("cloudinary_api_secret") ||
+      lower.includes("আপনার_")
+    );
+  };
+
+  const isCloudinaryApiPlaceholder = isPlaceholderKey(cloudinaryApiKey) || isPlaceholderKey(cloudinaryApiSecret);
+
+  const brevoApiKey = keys.brevoApiKey;
+  const brevoSenderEmail = keys.brevoSenderEmail;
+  const brevoSenderName = keys.brevoSenderName;
+
+  const geminiApiKey = process.env.GEMINI_API_KEY || "";
+
+  res.json({
+    success: true,
+    cloudinary: {
+      configured: !!(cloudinaryCloudName && cloudinaryCloudName !== "আপনার_ক্লাউড_নাম"),
+      cloudName: cloudinaryCloudName === "আপনার_ক্লাউড_নাম" ? "" : cloudinaryCloudName,
+      apiKey: (cloudinaryApiKey && !isPlaceholderKey(cloudinaryApiKey)) ? `${cloudinaryApiKey.slice(0, 4)}...${cloudinaryApiKey.slice(-2)}` : "",
+      hasSecret: !!(cloudinaryApiSecret && !isPlaceholderKey(cloudinaryApiSecret)),
+      uploadPreset: cloudinaryUploadPreset,
+      isUnsignedOnly: isCloudinaryApiPlaceholder,
+    },
+    brevo: {
+      configured: !!(brevoApiKey && brevoApiKey !== "আপনার_ব্রেভো_এপিআই_কি" && brevoApiKey !== "আপনার_ব্রেভো_এপিআই_কি_এখানে_দিন"),
+      apiKey: (brevoApiKey && brevoApiKey !== "আপনার_ব্রেভো_এপিআই_কি" && brevoApiKey !== "আপনার_ব্রেভো_এপিআই_কি_এখানে_দিন") ? `${brevoApiKey.slice(0, 5)}...${brevoApiKey.slice(-2)}` : "",
+      senderEmail: brevoSenderEmail,
+      senderName: brevoSenderName,
+      lastError: lastBrevoError,
+    },
+    gemini: {
+      configured: !!(geminiApiKey && geminiApiKey !== "MY_GEMINI_API_KEY"),
+    }
+  });
+});
+
+// Send a test diagnostic email
+app.post("/api/admin/test-email", async (req, res) => {
+  const keys = getApiKeys();
+  const brevoApiKey = keys.brevoApiKey;
+  const senderEmail = keys.brevoSenderEmail;
+  const senderName = keys.brevoSenderName;
+  const { testEmail } = req.body;
+
+  if (!brevoApiKey || brevoApiKey === "আপনার_ব্রেভো_এপিআই_কি" || brevoApiKey === "আপনার_ব্রেভো_এপিআই_কি_এখানে_দিন") {
+    return res.status(400).json({ error: "Brevo API Key is not configured on the server." });
+  }
+
+  const targetEmail = testEmail || senderEmail;
+
+  const testHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Brevo API Integration Test</title>
+    </head>
+    <body style="font-family: sans-serif; background-color: #f3f4f6; padding: 30px;">
+      <div style="max-width: 550px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; padding: 30px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="background-color: #e0e7ff; color: #4f46e5; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 12px; border-radius: 9999px;">Diagnostics Pass</span>
+          <h2 style="color: #1e1b4b; margin-top: 15px; font-size: 22px; font-weight: 800;">🚀 Brevo Integration Works!</h2>
+        </div>
+        <p style="color: #374151; font-size: 15px; line-height: 1.6;">Hello,</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">This is an automated verification email sent by your e-commerce application <strong>${senderName}</strong>.</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">If you received this email, it confirms that your <strong>BREVO_API_KEY</strong> is fully functional and successfully connected to Brevo's Transactional SMTP gateway!</p>
+        
+        <div style="background-color: #f9fafb; border-left: 4px solid #4f46e5; padding: 15px; margin: 25px 0; border-radius: 0 8px 8px 0;">
+          <strong style="font-size: 12px; color: #4b5563; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Test Details:</strong>
+          <span style="font-size: 13px; color: #1f2937; font-family: monospace; display: block; margin-top: 4px;">Timestamp: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' })} BST</span>
+          <span style="font-size: 13px; color: #1f2937; font-family: monospace; display: block;">Sender: ${senderName} &lt;${senderEmail}&gt;</span>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 11px; border-top: 1px solid #f3f4f6; padding-top: 15px; margin-top: 25px; text-align: center;">
+          Johurul BDShop Admin Settings | Mymensingh, Bangladesh
+        </p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: targetEmail, name: "Shop Admin / Test User" }],
+        subject: `🔔 [Johurul BDShop] Brevo SMTP API Connection Test - Success!`,
+        htmlContent: testHtml
+      })
+    });
+
+    if (response.ok) {
+      lastBrevoError = null;
+      return res.json({ success: true, message: `Successfully sent test email to ${targetEmail}!` });
+    } else {
+      const errBody = await response.text();
+      lastBrevoError = errBody;
+      return res.status(500).json({ error: `Brevo API returned error: ${errBody}` });
+    }
+  } catch (error: any) {
+    lastBrevoError = error.message || "Failed to reach Brevo SMTP servers.";
+    return res.status(500).json({ error: error.message || "Failed to reach Brevo SMTP servers." });
+  }
+});
+
+// Save updated API keys & integration settings dynamically
+app.post("/api/admin/save-keys", (req, res) => {
+  const {
+    brevoApiKey,
+    brevoSenderEmail,
+    brevoSenderName,
+    cloudinaryCloudName,
+    cloudinaryApiKey,
+    cloudinaryApiSecret,
+    cloudinaryUploadPreset,
+  } = req.body;
+
+  const success = saveApiKeys({
+    brevoApiKey: brevoApiKey ? brevoApiKey.trim() : undefined,
+    brevoSenderEmail: brevoSenderEmail ? brevoSenderEmail.trim() : undefined,
+    brevoSenderName: brevoSenderName ? brevoSenderName.trim() : undefined,
+    cloudinaryCloudName: cloudinaryCloudName ? cloudinaryCloudName.trim() : undefined,
+    cloudinaryApiKey: cloudinaryApiKey ? cloudinaryApiKey.trim() : undefined,
+    cloudinaryApiSecret: cloudinaryApiSecret ? cloudinaryApiSecret.trim() : undefined,
+    cloudinaryUploadPreset: cloudinaryUploadPreset ? cloudinaryUploadPreset.trim() : undefined,
+  });
+
+  if (success) {
+    return res.json({ success: true, message: "Settings saved successfully to keys-config.json!" });
+  } else {
+    return res.status(500).json({ error: "Failed to write keys-config.json file." });
+  }
+});
 
 // Vite middleware configuration for development
 async function startServer() {

@@ -164,6 +164,30 @@ export default function AdminPanel({
   // Product state
   const [isEditingProduct, setIsEditingProduct] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+
+  const uploadFileToServer = async (base64Data: string): Promise<string> => {
+    setIsUploadingImage(true);
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64Data })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log("Uploaded successfully. URL:", data.url);
+          return data.url;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to upload image to server:", err);
+    } finally {
+      setIsUploadingImage(false);
+    }
+    return base64Data; // fallback
+  };
 
   // AI-Powered Copywriting Engine
   const [isGeneratingCopy, setIsGeneratingCopy] = useState<boolean>(false);
@@ -226,9 +250,161 @@ export default function AdminPanel({
     }
   };
 
+  // API Verification States
+  const [keysConfig, setKeysConfig] = useState<any>(null);
+  const [isVerifyingKeys, setIsVerifyingKeys] = useState<boolean>(false);
+  const [testEmailAddress, setTestEmailAddress] = useState<string>("");
+  const [emailTestStatus, setEmailTestStatus] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState<boolean>(false);
+
+  // Form states to edit credentials dynamically
+  const [formBrevoApiKey, setFormBrevoApiKey] = useState<string>("");
+  const [formBrevoSenderEmail, setFormBrevoSenderEmail] = useState<string>("");
+  const [formBrevoSenderName, setFormBrevoSenderName] = useState<string>("");
+  const [formCloudinaryCloudName, setFormCloudinaryCloudName] = useState<string>("");
+  const [formCloudinaryApiKey, setFormCloudinaryApiKey] = useState<string>("");
+  const [formCloudinaryApiSecret, setFormCloudinaryApiSecret] = useState<string>("");
+  const [formCloudinaryUploadPreset, setFormCloudinaryUploadPreset] = useState<string>("");
+  const [isSavingCredentials, setIsSavingCredentials] = useState<boolean>(false);
+  const [saveCredentialsStatus, setSaveCredentialsStatus] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+
+  const fetchKeysConfigStatus = async () => {
+    setIsVerifyingKeys(true);
+    try {
+      const res = await fetch("/api/admin/verify-keys");
+      if (res.ok) {
+        const data = await res.json();
+        setKeysConfig(data);
+        if (data.brevo) {
+          setFormBrevoSenderEmail(prev => prev || data.brevo.senderEmail || "");
+          setFormBrevoSenderName(prev => prev || data.brevo.senderName || "");
+        }
+        if (data.cloudinary) {
+          setFormCloudinaryCloudName(prev => prev || data.cloudinary.cloudName || "");
+          setFormCloudinaryUploadPreset(prev => prev || data.cloudinary.uploadPreset || "");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch keys config:", err);
+    } finally {
+      setIsVerifyingKeys(false);
+    }
+  };
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingCredentials(true);
+    setSaveCredentialsStatus(null);
+    try {
+      const res = await fetch("/api/admin/save-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brevoApiKey: formBrevoApiKey || undefined,
+          brevoSenderEmail: formBrevoSenderEmail || undefined,
+          brevoSenderName: formBrevoSenderName || undefined,
+          cloudinaryCloudName: formCloudinaryCloudName || undefined,
+          cloudinaryApiKey: formCloudinaryApiKey || undefined,
+          cloudinaryApiSecret: formCloudinaryApiSecret || undefined,
+          cloudinaryUploadPreset: formCloudinaryUploadPreset || undefined,
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSaveCredentialsStatus({ success: true, message: data.message });
+        setFormBrevoApiKey(""); // clear sensitive keys field on client
+        setFormCloudinaryApiKey("");
+        setFormCloudinaryApiSecret("");
+        // Reload settings diagnostics
+        await fetchKeysConfigStatus();
+      } else {
+        setSaveCredentialsStatus({ success: false, error: data.error || "Failed to save configuration." });
+      }
+    } catch (err: any) {
+      setSaveCredentialsStatus({ success: false, error: err.message || "Network error." });
+    } finally {
+      setIsSavingCredentials(false);
+    }
+  };
+
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSendingTestEmail(true);
+    setEmailTestStatus(null);
+    try {
+      const res = await fetch("/api/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ testEmail: testEmailAddress })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailTestStatus({ success: true, message: data.message });
+      } else {
+        setEmailTestStatus({ success: false, error: data.error || "Failed to send email." });
+      }
+    } catch (err: any) {
+      setEmailTestStatus({ success: false, error: err.message || "Network error." });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
+  const [isTestingCloudinary, setIsTestingCloudinary] = useState<boolean>(false);
+  const [cloudinaryTestResult, setCloudinaryTestResult] = useState<{ success?: boolean; url?: string; error?: string; isFallback?: boolean } | null>(null);
+
+  const handleTestCloudinaryUpload = async (fileBase64?: string) => {
+    setIsTestingCloudinary(true);
+    setCloudinaryTestResult(null);
+    const imageToUpload = fileBase64 || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: imageToUpload })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCloudinaryTestResult({
+          success: true,
+          url: data.url,
+          isFallback: !!data.fallback
+        });
+      } else {
+        setCloudinaryTestResult({
+          success: false,
+          error: data.error || "Upload failed."
+        });
+      }
+    } catch (err: any) {
+      setCloudinaryTestResult({
+        success: false,
+        error: err.message || "Network error."
+      });
+    } finally {
+      setIsTestingCloudinary(false);
+    }
+  };
+
+  const handleCloudinaryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        handleTestCloudinaryUpload(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   useEffect(() => {
     if (activeTab === "analytics") {
       fetchBackendAnalytics();
+    }
+    if (activeTab === "users") {
+      fetchKeysConfigStatus();
     }
   }, [activeTab]);
 
@@ -347,20 +523,21 @@ export default function AdminPanel({
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
+      if (file.size > 10 * 1024 * 1024) {
         alert(
           lang === "bn"
-            ? "দুঃখিত, ইমেজের সাইজ ৩ মেগাবাইটের (3MB) কম হতে হবে।"
-            : "Sorry, the image size should be less than 3MB."
+            ? "দুঃখিত, ইমেজের সাইজ ১০ মেগাবাইটের (10MB) কম হতে হবে।"
+            : "Sorry, the image size should be less than 10MB."
         );
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         if (typeof reader.result === "string") {
+          const uploadedUrl = await uploadFileToServer(reader.result);
           setEditingProduct((prev) => ({
             ...(prev || {}),
-            image: reader.result as string
+            image: uploadedUrl
           }));
         }
       };
@@ -371,24 +548,25 @@ export default function AdminPanel({
   const handleLandingImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
+      if (file.size > 10 * 1024 * 1024) {
         alert(
           lang === "bn"
-            ? "দুঃখিত, ইমেজের সাইজ ৩ মেগাবাইটের (3MB) কম হতে হবে।"
-            : "Sorry, the image size should be less than 3MB."
+            ? "দুঃখিত, ইমেজের সাইজ ১০ মেগাবাইটের (10MB) কম হতে হবে।"
+            : "Sorry, the image size should be less than 10MB."
         );
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         if (typeof reader.result === "string") {
+          const uploadedUrl = await uploadFileToServer(reader.result);
           setEditingProduct((prev) => {
             if (!prev) return null;
             const currentImages = [...(prev.images || [])];
             while (currentImages.length <= index) {
               currentImages.push("");
             }
-            currentImages[index] = reader.result as string;
+            currentImages[index] = uploadedUrl;
             return {
               ...prev,
               images: currentImages
@@ -586,7 +764,7 @@ export default function AdminPanel({
     { id: "delivery", labelBn: "ডেলিভারি", labelEn: "Delivery", icon: Truck },
     { id: "sms", labelBn: "এসএমএস সিস্টেম", labelEn: "SMS", icon: MessageSquare },
     { id: "roles", labelBn: "অ্যাডমিন রোলস", labelEn: "Roles", icon: Key },
-    { id: "users", labelBn: "ইউজার লিস্ট", labelEn: "Users", icon: Settings },
+    { id: "users", labelBn: "সেটিংস ও এপিআই", labelEn: "Settings & APIs", icon: Settings },
   ];
 
   // Stock / Inventory calculations
@@ -2381,7 +2559,14 @@ export default function AdminPanel({
                     </div>
 
                     {/* Preview box */}
-                    <div className="border border-gray-200 rounded-2xl bg-white p-2.5 flex items-center justify-center relative min-h-[110px]">
+                    <div className="border border-gray-200 rounded-2xl bg-white p-2.5 flex items-center justify-center relative min-h-[110px] overflow-hidden">
+                      {isUploadingImage && (
+                        <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1.5 z-10">
+                          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-[9px] font-bold text-indigo-950 uppercase tracking-widest animate-pulse">Uploading...</span>
+                        </div>
+                      )}
+                      
                       {editingProduct?.image ? (
                         <div className="relative w-full h-full group flex items-center justify-center">
                           <img 
@@ -4696,6 +4881,503 @@ export default function AdminPanel({
       {/* RENDER USERS */}
       {activeTab === "users" && (
         <div className="space-y-6 animate-fade-in animate-duration-200">
+          {/* API Configuration & Connection Diagnostics */}
+          <div className="bg-white border border-gray-150 rounded-3xl p-6 shadow-sm space-y-5 font-sans">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-indigo-600 animate-spin-slow" />
+                  {lang === "bn" ? "সিস্টেম ইন্টিগ্রেশন এবং এপিআই স্ট্যাটাস" : "System Integrations & API Credentials Check"}
+                </h3>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  {lang === "bn" 
+                    ? "আপনার ক্লাউডিনারি ইমেজ আপলোড, ব্রেভো ট্রানজ্যাকショナル ইমেল এবং জেমিনি এআই অ্যাসিস্ট্যান্টের লাইভ সংযোগ পরীক্ষা করুন।" 
+                    : "Real-time diagnostic verification for Cloudinary Image storage, Brevo Transactional Email alerts, and Gemini AI copywriters."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchKeysConfigStatus}
+                disabled={isVerifyingKeys}
+                className="inline-flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all disabled:opacity-50 font-sans"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isVerifyingKeys ? "animate-spin" : ""}`} />
+                {lang === "bn" ? "রিফ্রেশ করুন" : "Refresh Status"}
+              </button>
+            </div>
+
+            {isVerifyingKeys && !keysConfig ? (
+              <div className="py-8 flex flex-col items-center justify-center gap-2">
+                <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-slate-500 font-bold">{lang === "bn" ? "সংযোগ পরীক্ষা করা হচ্ছে..." : "Loading diagnostics..."}</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* 1. CLOUDINARY CARD */}
+                <div className="border border-gray-100 bg-slate-50/50 rounded-2xl p-4.5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-sky-50 text-sky-600 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-900 tracking-tight">Cloudinary</h4>
+                          <span className="text-[9px] text-gray-400 font-bold block leading-none">Product Image Hosting</span>
+                        </div>
+                      </div>
+                      {keysConfig?.cloudinary?.configured ? (
+                        keysConfig?.cloudinary?.isUnsignedOnly ? (
+                          <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <Check className="w-3 h-3" /> UNSIGNED PRESET
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <Check className="w-3 h-3" /> CONNECTED (SIGNED)
+                          </span>
+                        )
+                      ) : (
+                        <span className="bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> BASE64 FALLBACK
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px] font-medium text-slate-600">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "স্ট্যাটাস:" : "Status:"}</span>
+                        <span className="font-bold text-slate-900">
+                          {keysConfig?.cloudinary?.configured 
+                            ? (keysConfig?.cloudinary?.isUnsignedOnly 
+                              ? (lang === "bn" ? "সক্রিয় (আনসাইন্ড প্রিসেট)" : "Active (Unsigned Preset Mode)")
+                              : (lang === "bn" ? "সক্রিয় (সাইন্ড এপিআই)" : "Active (Signed API Storage)"))
+                            : (lang === "bn" ? "নিষ্ক্রিয় (লোকাল স্টোরেজ)" : "Inactive (Local Base64 Storage)")}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "ক্লাউড নাম:" : "Cloud Name:"}</span>
+                        <span className="font-mono font-bold text-slate-800">{keysConfig?.cloudinary?.cloudName || "Not set"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "এপিআই কি:" : "API Key:"}</span>
+                        <span className="font-mono text-slate-500 font-semibold">
+                          {keysConfig?.cloudinary?.isUnsignedOnly 
+                            ? (lang === "bn" ? "প্রয়োজন নেই (আনসাইন্ড)" : "Not needed (Unsigned Mode)") 
+                            : (keysConfig?.cloudinary?.apiKey || "Not set")}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "আপলোড প্রিসেট:" : "Upload Preset:"}</span>
+                        <span className="font-mono font-bold text-slate-800">{keysConfig?.cloudinary?.uploadPreset || "ml_default"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cloudinary Diagnostic Upload Test */}
+                  <div className="border-t border-gray-100/80 pt-3 space-y-2">
+                    <label className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider block">
+                      {lang === "bn" ? "ইমেজ আপলোড টেস্ট করুন" : "Cloudinary Diagnostics Test"}
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTestCloudinaryUpload()}
+                        disabled={isTestingCloudinary || !keysConfig?.cloudinary?.configured}
+                        className="flex-1 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-bold text-[10px] py-1.5 px-2.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        {isTestingCloudinary ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3" />
+                            {lang === "bn" ? "অটো টেস্ট করুন" : "Instant Test"}
+                          </>
+                        )}
+                      </button>
+
+                      <label className="flex-1 bg-gray-100 hover:bg-gray-200 text-slate-800 font-bold text-[10px] py-1.5 px-2.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 border border-gray-200 text-center">
+                        <ImageIcon className="w-3 h-3" />
+                        {lang === "bn" ? "ফাইল বাছুন" : "Choose File"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCloudinaryFileChange}
+                          disabled={isTestingCloudinary || !keysConfig?.cloudinary?.configured}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Status message */}
+                    {cloudinaryTestResult && (
+                      <div className={`text-[10px] font-bold p-1.5 rounded-md border space-y-1 ${
+                        cloudinaryTestResult.success 
+                          ? "bg-green-50 text-green-800 border-green-100" 
+                          : "bg-red-50 text-red-800 border-red-100"
+                      }`}>
+                        {cloudinaryTestResult.success ? (
+                          <div className="space-y-1">
+                            <span className="block">{lang === "bn" ? "আপলোড সফল হয়েছে!" : "Upload Success!"}</span>
+                            {cloudinaryTestResult.isFallback ? (
+                              <span className="text-[9px] text-amber-700 block font-normal leading-tight">
+                                {lang === "bn" ? "সতর্কতা: বেস৬৪ ফলব্যাক ব্যবহার করা হয়েছে।" : "Note: Base64 fallback used. Check Cloud Name config."}
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1.5 pt-1">
+                                <img 
+                                  src={cloudinaryTestResult.url} 
+                                  alt="Test thumbnail" 
+                                  referrerPolicy="no-referrer" 
+                                  className="w-8 h-8 rounded object-cover border border-green-200"
+                                />
+                                <a 
+                                  href={cloudinaryTestResult.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="text-sky-600 underline font-mono text-[8px] truncate max-w-[120px] block"
+                                >
+                                  {cloudinaryTestResult.url}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span>{lang === "bn" ? `সমস্যা হয়েছে: ${cloudinaryTestResult.error}` : `Error: ${cloudinaryTestResult.error}`}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. GEMINI AI CARD */}
+                <div className="border border-gray-100 bg-slate-50/50 rounded-2xl p-4.5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-violet-50 text-violet-600 rounded-lg flex items-center justify-center">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-900 tracking-tight">Gemini AI</h4>
+                          <span className="text-[9px] text-gray-400 font-bold block leading-none">Content & Ad Generator</span>
+                        </div>
+                      </div>
+                      {keysConfig?.gemini?.configured ? (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <Check className="w-3 h-3" /> ACTIVE
+                        </span>
+                      ) : (
+                        <span className="bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> LOCAL SIMULATION
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px] font-medium text-slate-600">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "মডেল:" : "Model:"}</span>
+                        <span className="font-bold text-slate-900">gemini-3.5-flash</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "ব্যবহার:" : "Usage:"}</span>
+                        <span className="font-bold text-indigo-600">{lang === "bn" ? "আনলিমিটেড কপিরাইটিং" : "Product & Ad Copy Generator"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "এআই সার্চ:" : "AI Search:"}</span>
+                        <span className="font-bold text-emerald-600">{keysConfig?.gemini?.configured ? "Enabled" : "Offline Fallback"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-gray-400 leading-normal border-t border-gray-100/80 pt-3">
+                    {lang === "bn"
+                      ? "জেমিনি এআই এপিআই কী সক্রিয় থাকলে আপনি কাস্টম প্রোডাক্ট ডেসক্রিপশন এবং ভাইরাল ফেসবুক ও টিকটক অ্যাড স্ক্রিপ্ট এক ক্লিকেই তৈরি করতে পারবেন।"
+                      : "The integrated Gemini-3.5-Flash model generates smart product copy and optimized social media ad scripts on demand."}
+                  </p>
+                </div>
+
+                {/* 3. BREVO EMAIL CARD */}
+                <div className="border border-gray-100 bg-slate-50/50 rounded-2xl p-4.5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-900 tracking-tight">Brevo Mailer</h4>
+                          <span className="text-[9px] text-gray-400 font-bold block leading-none">Email SMTP Notifications</span>
+                        </div>
+                      </div>
+                      {keysConfig?.brevo?.configured ? (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <Check className="w-3 h-3" /> CONNECTED
+                        </span>
+                      ) : (
+                        <span className="bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> SIMULATED SMTP
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px] font-medium text-slate-600 font-sans">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "প্রেরক নাম:" : "Sender Name:"}</span>
+                        <span className="font-bold text-slate-800">{keysConfig?.brevo?.senderName || "Not set"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "প্রেরক ইমেল:" : "Sender Email:"}</span>
+                        <span className="font-bold text-slate-800 max-w-[130px] truncate" title={keysConfig?.brevo?.senderEmail}>{keysConfig?.brevo?.senderEmail || "Not set"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold">{lang === "bn" ? "এপিআই কি:" : "API Key:"}</span>
+                        <span className="font-mono text-slate-500 font-semibold">{keysConfig?.brevo?.apiKey || "Not set"}</span>
+                      </div>
+                    </div>
+
+                    {keysConfig?.brevo?.lastError && (
+                      <div className="bg-red-50 text-red-800 border border-red-100 rounded-xl p-2.5 text-[10px] space-y-1 font-sans">
+                        <div className="font-extrabold flex items-center gap-1 text-red-900">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>{lang === "bn" ? "সর্বশেষ ইমেল ডেলিভারি ব্যর্থতার কারণ:" : "Last Email Delivery Error:"}</span>
+                        </div>
+                        <p className="font-mono text-[9px] bg-white p-1 rounded border border-red-50 break-all leading-tight font-bold text-red-700">
+                          {keysConfig.brevo.lastError}
+                        </p>
+                        <p className="text-[9px] text-red-700/90 leading-normal font-semibold">
+                          {lang === "bn" 
+                            ? "💡 পরামর্শ: আপনার ব্রেভো অ্যাকাউন্টে প্রেরক ইমেলটি (Sender Email) ভেরিফাইড প্রেরক (Verified Sender) হিসেবে যোগ করা থাকতে হবে।" 
+                            : "💡 Tip: Make sure the Sender Email is registered as a verified sender inside your Brevo dashboard under 'Senders & IPs'."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Diagnostic Send Test Email Form */}
+                  <div className="border-t border-gray-100/80 pt-3 space-y-2">
+                    <label className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider block">
+                      {lang === "bn" ? "ইমেল সংযোগ টেস্ট করুন" : "SMTP Diagnostics Test Mail"}
+                    </label>
+                    <form onSubmit={handleSendTestEmail} className="flex gap-1.5">
+                      <input
+                        type="email"
+                        required
+                        placeholder={lang === "bn" ? "যেমন: testing@gmail.com" : "e.g., test@domain.com"}
+                        value={testEmailAddress}
+                        onChange={(e) => setTestEmailAddress(e.target.value)}
+                        className="flex-1 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-sans"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSendingTestEmail || !keysConfig?.brevo?.configured}
+                        className="bg-[#3730a3] hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-[10px] px-2.5 py-1 rounded-lg transition-all shrink-0 cursor-pointer"
+                      >
+                        {isSendingTestEmail ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          lang === "bn" ? "টেস্ট" : "Send"
+                        )}
+                      </button>
+                    </form>
+                    
+                    {/* Status message */}
+                    {emailTestStatus && (
+                      <div className={`text-[10px] font-bold p-1.5 rounded-md border ${
+                        emailTestStatus.success 
+                          ? "bg-green-50 text-green-800 border-green-100" 
+                          : "bg-red-50 text-red-800 border-red-100"
+                      }`}>
+                        {emailTestStatus.success ? (
+                          <span>{lang === "bn" ? "টেস্ট ইমেইল পাঠানো হয়েছে! ইনবক্স চেক করুন।" : emailTestStatus.message}</span>
+                        ) : (
+                          <span>{lang === "bn" ? `সমস্যা হয়েছে: ${emailTestStatus.error}` : emailTestStatus.error}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+
+          {/* Dynamic API Credentials Setup Form */}
+          <div className="bg-white border border-gray-150 rounded-3xl p-6 shadow-sm space-y-5 font-sans">
+            <div>
+              <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Settings className="w-5 h-5 text-[#3730a3]" />
+                {lang === "bn" ? "এপিআই ও ইমেল সেটিংস পরিবর্তন করুন" : "Configure API & Email Credentials"}
+              </h3>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                {lang === "bn" 
+                  ? "আপনার নিজস্ব ব্রেভো এপিআই কি ও ক্লাউডিনারি ইমেজ সেটিংস পরিবর্তন ও আপডেট করতে নিচের ফর্মটি ব্যবহার করুন।" 
+                  : "Use the form below to set your custom Brevo Email API key and Cloudinary upload credentials."}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveCredentials} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Brevo SMTP Setup */}
+                <div className="border border-slate-100 bg-slate-50/30 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    {lang === "bn" ? "ব্রেভো ইমেল সেটিংস (Brevo SMTP)" : "Brevo Email Settings"}
+                  </h4>
+                  
+                  <div className="space-y-3.5">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "ব্রেভো এপিআই কী (Brevo API Key):" : "Brevo API Key (v3):"}
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="xkeysib-..."
+                        value={formBrevoApiKey}
+                        onChange={(e) => setFormBrevoApiKey(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-mono"
+                      />
+                      <span className="text-[9px] text-slate-400 block font-semibold leading-tight">
+                        {lang === "bn" ? "💡 পরিবর্তন না করতে চাইলে খালি রাখুন।" : "💡 Leave blank to keep existing key."}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "প্রেরক ইমেল (Sender Email):" : "Sender Email Address:"}
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="tanjim7862@gmail.com"
+                        value={formBrevoSenderEmail}
+                        onChange={(e) => setFormBrevoSenderEmail(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600"
+                      />
+                      <span className="text-[9px] text-red-500/90 block font-bold leading-normal">
+                        {lang === "bn" 
+                          ? "⚠️ এই ইমেলটি অবশ্যই আপনার Brevo অ্যাকাউন্টে 'Verified Sender' হিসেবে যোগ করা থাকতে হবে, অন্যথায় মেইল যাবে না!" 
+                          : "⚠️ This email MUST be registered as a 'Verified Sender' in your Brevo account dashboard!"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "প্রেরক নাম (Sender Name):" : "Sender Name:"}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="JOHURUL BDShop"
+                        value={formBrevoSenderName}
+                        onChange={(e) => setFormBrevoSenderName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cloudinary Hosting Setup */}
+                <div className="border border-slate-100 bg-slate-50/30 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-xs font-black text-sky-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                    {lang === "bn" ? "ক্লাউডিনারি ইমেজ হোস্টিং" : "Cloudinary Image Hosting"}
+                  </h4>
+
+                  <div className="space-y-3.5">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "ক্লাউড নাম (Cloud Name):" : "Cloud Name:"}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., dxxxxxx"
+                        value={formCloudinaryCloudName}
+                        onChange={(e) => setFormCloudinaryCloudName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "আপলোড প্রিসেট (Upload Preset):" : "Upload Preset:"}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="ml_default"
+                        value={formCloudinaryUploadPreset}
+                        onChange={(e) => setFormCloudinaryUploadPreset(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "এপিআই কি (Cloudinary API Key):" : "Cloudinary API Key:"}
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Cloudinary API Key"
+                        value={formCloudinaryApiKey}
+                        onChange={(e) => setFormCloudinaryApiKey(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        {lang === "bn" ? "এপিআই সিক্রেট (Cloudinary API Secret):" : "Cloudinary API Secret:"}
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Cloudinary API Secret"
+                        value={formCloudinaryApiSecret}
+                        onChange={(e) => setFormCloudinaryApiSecret(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {saveCredentialsStatus && (
+                <div className={`p-3 rounded-xl border text-xs font-bold ${
+                  saveCredentialsStatus.success
+                    ? "bg-green-50 text-green-800 border-green-100"
+                    : "bg-red-50 text-red-800 border-red-100"
+                }`}>
+                  {saveCredentialsStatus.success ? (
+                    <span>{lang === "bn" ? "✓ কনফিগারেশন সফলভাবে সেভ করা হয়েছে!" : "✓ Integration settings successfully updated!"}</span>
+                  ) : (
+                    <span>{saveCredentialsStatus.error}</span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingCredentials}
+                  className="bg-[#3730a3] hover:bg-indigo-800 text-white font-black text-xs px-6 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingCredentials ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{lang === "bn" ? "সেভ করা হচ্ছে..." : "Saving..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>{lang === "bn" ? "সেটিংস আপডেট করুন" : "Save Configurations"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
             <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4 h-fit">
               <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "নতুন স্টাফ প্রোফাইল অ্যাড করুন" : "Register Admin Staff Account"}</h4>

@@ -447,6 +447,7 @@ export default function App() {
   // Checkout shipping states
   const [customerName, setCustomerName] = useState<string>("");
   const [customerPhone, setCustomerPhone] = useState<string>("");
+  const [customerEmail, setCustomerEmail] = useState<string>("");
   const [customerAddress, setCustomerAddress] = useState<string>("");
   const [customerDivision, setCustomerDivision] = useState<string>("Dhaka (ঢাকা)");
   const [customerDistrict, setCustomerDistrict] = useState<string>("Dhaka (ঢাকা)");
@@ -897,7 +898,8 @@ export default function App() {
       status: OrderStatus.RECEIVED,
       trackingHistory: createDefaultTrackingHistory(new Date()),
       createdAt: new Date().toISOString(),
-      fbCampaignRef: campaignRef
+      fbCampaignRef: campaignRef,
+      customerEmail: customerEmail || undefined
     };
 
     // Deduct stock
@@ -986,7 +988,8 @@ export default function App() {
         paymentMethod: checkoutPaymentMethod,
         onlineGatewayType: checkoutPaymentMethod === "online" ? onlineGatewayType : undefined,
         paymentTransactionId: checkoutPaymentMethod === "online" ? paymentTransactionId : undefined,
-        fbCampaignRef: campaignRef
+        fbCampaignRef: campaignRef,
+        customerEmail: customerEmail || undefined
       })
     })
     .then(res => res.json())
@@ -1000,6 +1003,7 @@ export default function App() {
     updateProductsAndSync(updatedProducts);
     updateOrdersAndSync([newOrder, ...orders]);
     setCart([]);
+    setCustomerEmail("");
     setIsCheckoutOpen(false);
 
     // Set tracking target and redirect to tracking screen
@@ -2597,6 +2601,24 @@ export default function App() {
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#3730a3] focus:bg-white transition-all"
                       placeholder="e.g. 01712345678"
+                    />
+                  </div>
+
+                  {/* Email (Optional) */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold block flex items-center justify-between">
+                      <span>{lang === "bn" ? "ইমেইল ঠিকানা (ঐচ্ছিক)" : "Email Address (Optional)"}</span>
+                      <span className="text-[9px] text-[#3730a3] font-extrabold bg-indigo-50 px-1.5 py-0.5 rounded-full">
+                        {lang === "bn" ? "ফ্রি অর্ডার রিসিট" : "Free Order Receipt"}
+                      </span>
+                    </label>
+                    <input
+                      id="checkout-email-input"
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#3730a3] focus:bg-white transition-all"
+                      placeholder={lang === "bn" ? "যেমনঃ client@domain.com" : "e.g. buyer@example.com"}
                     />
                   </div>
 
