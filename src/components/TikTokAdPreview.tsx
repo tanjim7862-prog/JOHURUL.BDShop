@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Product } from "../types";
 import { 
   Copy, Globe, Sparkles, AlertCircle, RefreshCw, Heart, MessageCircle, 
@@ -31,6 +31,49 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
     return localStorage.getItem("tiktok_username") || "@tanjim.shop";
   });
   const [isEditingId, setIsEditingId] = useState<boolean>(false);
+
+  // Real human-like TTS Voice States
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+      
+      if (voices.length > 0) {
+        // Try to find a premium, realistic/natural online voice for the selected language
+        const isEn = campaignLanguage === "english";
+        const preferred = voices.find(v => {
+          const nameLower = v.name.toLowerCase();
+          const langLower = v.lang.toLowerCase();
+          if (isEn) {
+            return langLower.startsWith("en") && (nameLower.includes("natural") || nameLower.includes("google") || nameLower.includes("zira") || nameLower.includes("aria") || nameLower.includes("guy"));
+          } else {
+            return langLower.startsWith("bn") && (nameLower.includes("natural") || nameLower.includes("google") || nameLower.includes("nabanita") || nameLower.includes("sabina") || nameLower.includes("pradeep"));
+          }
+        });
+        
+        if (preferred) {
+          setSelectedVoiceName(preferred.name);
+        } else {
+          const firstMatching = voices.find(v => isEn ? v.lang.toLowerCase().startsWith("en") : v.lang.toLowerCase().startsWith("bn"));
+          if (firstMatching) {
+            setSelectedVoiceName(firstMatching.name);
+          } else if (voices[0]) {
+            setSelectedVoiceName(voices[0].name);
+          }
+        }
+      }
+    };
+
+    loadVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, [campaignLanguage]);
 
   // 4 Scenes custom images state
   const [sceneImages, setSceneImages] = useState<string[]>(() => {
@@ -220,8 +263,20 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
     
     // Choose appropriate voice/language attributes
     utterance.lang = campaignLanguage === "bengali" ? "bn-BD" : "en-US";
-    utterance.rate = campaignLanguage === "bengali" ? 1.1 : 1.0;
-    utterance.pitch = 1.1;
+    
+    // Select the user-specified realistic voice
+    if (selectedVoiceName) {
+      const voices = window.speechSynthesis.getVoices();
+      const matchedVoice = voices.find(v => v.name === selectedVoiceName);
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
+      }
+    }
+
+    // Set more natural human rate and pitch
+    const isNatural = selectedVoiceName.toLowerCase().includes("natural") || selectedVoiceName.toLowerCase().includes("online");
+    utterance.rate = isNatural ? 1.0 : (campaignLanguage === "bengali" ? 1.1 : 1.0);
+    utterance.pitch = isNatural ? 1.0 : 1.05;
 
     speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
@@ -612,6 +667,67 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
             >
               🇺🇸 English Voice
             </button>
+          </div>
+        </div>
+
+        {/* Real Human-Like Voice Customizer */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+              {lang === "bn" ? "🎙️ এআই ভয়েসওভার কণ্ঠস্বর" : "🎙️ AI Voiceover Speaker"}
+            </label>
+            <span className="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full text-[#3730a3] text-[9px] font-black uppercase tracking-wider animate-pulse">
+              ✨ {lang === "bn" ? "রিয়েল হিউম্যান ভয়েস" : "Real Human Voice"}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <select
+              value={selectedVoiceName}
+              onChange={(e) => setSelectedVoiceName(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+            >
+              {availableVoices.filter(v => {
+                const isBn = v.lang.toLowerCase().startsWith("bn") || v.lang.toLowerCase().startsWith("ben");
+                return campaignLanguage === "bengali" ? isBn : !isBn && v.lang.toLowerCase().startsWith("en");
+              }).map((voice) => {
+                // Prettify voice name
+                let cleanName = voice.name;
+                if (voice.name.includes("Microsoft") && voice.name.includes("Natural")) {
+                  cleanName = `🗣️ Premium Natural: ${voice.name.replace("Microsoft", "").replace("Online (Natural)", "").replace(" - Bengali (Bangladesh)", "").replace(" - Bengali (India)", "").trim()}`;
+                } else if (voice.name.includes("Google")) {
+                  cleanName = `🤖 Google Assistant: ${voice.name.replace("Google", "").trim()}`;
+                } else if (voice.name.includes("Natural")) {
+                  cleanName = `✨ Real Voice: ${voice.name}`;
+                } else {
+                  cleanName = `👤 Device Default: ${voice.name}`;
+                }
+                return (
+                  <option key={voice.name} value={voice.name}>
+                    {cleanName} ({voice.lang})
+                  </option>
+                );
+              })}
+              {availableVoices.filter(v => {
+                const isBn = v.lang.toLowerCase().startsWith("bn") || v.lang.toLowerCase().startsWith("ben");
+                return campaignLanguage === "bengali" ? isBn : !isBn && v.lang.toLowerCase().startsWith("en");
+              }).length === 0 && (
+                <option value="">
+                  {lang === "bn" ? "🗣️ ডিভাইস ডিফল্ট বাংলা ভয়েস" : "🗣️ Device Default Voice"}
+                </option>
+              )}
+            </select>
+
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-2.5 space-y-1">
+              <p className="text-[10px] text-indigo-900 font-extrabold flex items-start gap-1 leading-normal">
+                <span>💡</span>
+                <span>
+                  {lang === "bn" 
+                    ? "টিপসঃ অসাধারণ রিয়েল মানুষের মতো ইমোশনাল কণ্ঠস্বর শুনতে 'Microsoft Edge' অথবা 'Google Chrome' ব্রাউজার ব্যবহার করুন। ক্রোম/এজে 'Premium Natural' বা 'Nabanita' ভয়েসটি সিলেক্ট করুন।" 
+                    : "Tip: For breathtakingly realistic, professional human speech, open this app in 'Microsoft Edge' or 'Google Chrome' and choose the 'Premium Natural' or 'Nabanita' voice profile."}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
 
