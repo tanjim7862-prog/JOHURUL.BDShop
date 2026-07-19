@@ -5473,32 +5473,35 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* PRINTABLE ORDER SLIP / INVOICE GENERATION OVERLAY MODAL */}
+       {/* PRINTABLE ORDER SLIP / INVOICE GENERATION OVERLAY MODAL */}
       {printingOrder && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 print:p-0 print:bg-white print:absolute print:inset-0">
-          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 shadow-xl border border-gray-100 flex flex-col gap-4 print:shadow-none print:border-none print:p-0 print:max-w-none">
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setPrintingOrder(null); }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 print:p-0 print:bg-white print:absolute print:inset-0 cursor-pointer"
+        >
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-4 sm:p-6 shadow-xl border border-gray-100 flex flex-col gap-4 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto cursor-default print:shadow-none print:border-none print:p-0 print:max-w-none print:max-h-none print:overflow-visible">
             
             {/* Modal Actions Header (Explicitly hidden during media printing) */}
-            <div className="flex justify-between items-center pb-3 border-b border-gray-150 print:hidden">
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pb-3 border-b border-gray-150 print:hidden">
               <div className="flex items-center gap-2">
                 <span className="text-xl">🧾</span>
                 <h3 className="font-extrabold text-sm text-gray-850">
                   {lang === "bn" ? "অর্ডার স্লিপ ও ইনভয়েস জেনারেশন" : "Order Slip & Invoice Generation"}
                 </h3>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm flex-1 sm:flex-initial"
                 >
                   <Printer className="w-4 h-4" />
-                  {lang === "bn" ? "প্রিন্ট / পিডিএফ সেভ করুন" : "Print / Save PDF"}
+                  {lang === "bn" ? "প্রিন্ট করুন" : "Print Invoice"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPrintingOrder(null)}
-                  className="bg-slate-100 hover:bg-slate-200 text-gray-500 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                  className="bg-slate-100 hover:bg-slate-200 text-gray-500 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer flex-1 sm:flex-initial"
                 >
                   <X className="w-4 h-4" />
                   {lang === "bn" ? "বন্ধ করুন" : "Close"}
@@ -5756,23 +5759,35 @@ export default function AdminPanel({
                         const singlePrintUrl = `${window.location.origin}${window.location.pathname}?print_order_id=${printingOrder.id}&print_supplier=${encodeURIComponent(shopName)}&token=${secureToken}`;
 
                         const waText = (() => {
-                          const itemsSummary = itemsForThisShop.map(item => {
+                          let itemsSubtotal = 0;
+                          const itemsSummary = itemsForThisShop.map((item, index) => {
                             const prod = products.find(p => p.id === item.product.id) || item.product;
                             const name = lang === "bn" ? prod.banglaName || prod.name : prod.name;
+                            const itemPrice = item.price || (prod.isFlashSale && prod.flashSalePrice ? prod.flashSalePrice : prod.price);
+                            const itemTotal = itemPrice * item.quantity;
+                            itemsSubtotal += itemTotal;
+
                             const variantDetails = [
                               item.selectedSize ? `Size: ${item.selectedSize}` : "",
                               item.selectedColor ? `Color: ${item.selectedColor}` : ""
                             ].filter(Boolean).join(", ");
-                            return `• ${name} x${item.quantity} ${variantDetails ? `(${variantDetails})` : ""}`;
-                          }).join("\n");
+
+                            const imgString = prod.image ? `\n   🖼️ Image: ${prod.image}` : '';
+                            
+                            return `✅ [ ] SL ${index + 1}: *${name}*\n   - Qty: ${item.quantity} | Unit: ৳${itemPrice} | Total: ৳${itemTotal}\n   ${variantDetails ? `- Variant: ${variantDetails}\n   ` : ""}${imgString}`;
+                          }).join("\n\n");
+
+                          const isInsideDhaka = printingOrder.customerDistrict.toLowerCase() === "dhaka" || printingOrder.customerDistrict.toLowerCase().includes("ঢাকা");
+                          const shippingFee = itemsSubtotal >= 3000 ? 0 : (isInsideDhaka ? 80 : 150);
+                          const grandTotal = itemsSubtotal + shippingFee;
 
                           const orderDate = new Date(printingOrder.createdAt).toLocaleDateString(lang === "bn" ? 'bn-BD' : 'en-US', {
                             year: 'numeric', month: 'short', day: 'numeric'
                           });
 
                           return lang === "bn" 
-                            ? encodeURIComponent(`*📦 সরবরাহ অর্ডার স্লিপ - ${shopName.toUpperCase()}*\n\n*অর্ডার আইডি:* #${printingOrder.id}\n*তারিখ:* ${orderDate}\n\n🖨️ *রসিদ ও লেবেল সরাসরি প্রিন্ট করার সিকিউর লিংক (Direct Print Link):*\n${singlePrintUrl}\n\n*গ্রাহকের বিবরণ:*\n- নাম: ${printingOrder.customerName}\n- মোবাইল: ${printingOrder.customerPhone}\n- ঠিকানা: ${printingOrder.customerAddress}\n- থানা: ${printingOrder.customerThana || "N/A"}\n- জেলা: ${printingOrder.customerDistrict}\n\n*পণ্য বিবরণী:*\n${itemsSummary}\n\nদয়া করে প্রিন্ট করা রসিদ পণ্যটির সাথে সংযুক্ত করে দ্রুত ডেলিভারির জন্য প্রস্তুত করুন। ধন্যবাদ!`)
-                            : encodeURIComponent(`*📦 NEW ORDER DISPATCH REQUEST - ${shopName.toUpperCase()}*\n\n*Order ID:* #${printingOrder.id}\n*Date:* ${orderDate}\n\n🖨️ *Direct Secure Link to Print and Attach Slip:*\n${singlePrintUrl}\n\n*Customer Details:*\n- Name: ${printingOrder.customerName}\n- Phone: ${printingOrder.customerPhone}\n- Address: ${printingOrder.customerAddress}\n- Thana: ${printingOrder.customerThana || "N/A"}\n- District: ${printingOrder.customerDistrict}\n\n*Ordered Items:*\n${itemsSummary}\n\nPlease print the slip, attach it to the product, and prepare for delivery. Thank you!`);
+                            ? encodeURIComponent(`*📦 সরবরাহ অর্ডার রসিদ ও সামারি ডেসপ্যাচ - ${shopName.toUpperCase()}*\n\n*অর্ডার আইডি:* #${printingOrder.id}\n*তারিখ:* ${orderDate}\n\n🖨️ *রসিদ ও লেবেল সরাসরি প্রিন্ট করার সিকিউর লিংক:*\n${singlePrintUrl}\n\n*👥 গ্রাহকের বিবরণ:*\n- নাম: ${printingOrder.customerName}\n- মোবাইল: ${printingOrder.customerPhone}\n- ঠিকানা: ${printingOrder.customerAddress}\n- থানা: ${printingOrder.customerThana || "N/A"}\n- জেলা: ${printingOrder.customerDistrict}\n\n*🛍️ পণ্য বিবরণী (চেকলিস্ট):*\n${itemsSummary}\n\n*💰 বিল হিসাব (Summary Billing):*\n- সাবটোটাল: ৳${itemsSubtotal}\n- ডেলিভারি চার্জ: ৳${shippingFee}\n- *সর্বমোট বিল (সংগ্রহযোগ্য): ৳${grandTotal}*\n\nদয়া করে টিক চিহ্ন দিয়ে পণ্যগুলো প্যাক করুন এবং প্রিন্ট করা রসিদ স্লিপটি পণ্যটির সাথে সংযুক্ত করে প্রস্তুত করুন। ধন্যবাদ!`)
+                            : encodeURIComponent(`*📦 NEW ORDER DISPATCH SUMMARY - ${shopName.toUpperCase()}*\n\n*Order ID:* #${printingOrder.id}\n*Date:* ${orderDate}\n\n🖨️ *Direct Secure Link to Print and Attach Invoice:*\n${singlePrintUrl}\n\n*👥 Customer Details:*\n- Name: ${printingOrder.customerName}\n- Phone: ${printingOrder.customerPhone}\n- Address: ${printingOrder.customerAddress}\n- Thana: ${printingOrder.customerThana || "N/A"}\n- District: ${printingOrder.customerDistrict}\n\n*🛍️ Ordered Items (Checklist):*\n${itemsSummary}\n\n*💰 Summary Billing:*\n- Subtotal: ৳${itemsSubtotal}\n- Shipping: ৳${shippingFee}\n- *Total Collectable Amount: ৳${grandTotal}*\n\nCheck item checkboxes, print the invoice, attach it to the product parcel, and prepare for delivery. Thank you!`);
                         })();
 
                         const waLink = `https://api.whatsapp.com/send?phone=${formattedPhoneForWa}&text=${waText}`;
