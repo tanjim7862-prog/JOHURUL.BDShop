@@ -1747,9 +1747,12 @@ export default function App() {
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border-2 border-indigo-400/80 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-indigo-950 ring-2 ring-indigo-300/30"
                 >
                   <img
-                    src="/johurul_support.jpg"
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80"
                     alt="Customer Support"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80";
+                    }}
                     className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700 ease-out"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/95 via-indigo-950/35 to-black/20"></div>
@@ -3208,9 +3211,12 @@ export default function App() {
             {/* Support Manager Image Frame */}
             <div className="w-28 h-28 mx-auto rounded-full p-1 bg-gradient-to-tr from-[#3730a3] to-emerald-400 shadow-lg relative">
               <img
-                src="/johurul_support.jpg"
+                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80"
                 alt="Totini Customer Support Manager"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80";
+                }}
                 className="w-full h-full object-cover rounded-full"
               />
               <span className="absolute bottom-1 right-1 bg-emerald-500 text-white p-1 rounded-full border-2 border-white text-xs shadow-xs">
