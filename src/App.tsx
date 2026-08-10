@@ -24,7 +24,8 @@ import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebas
 import { 
   ShoppingBag, Search, Filter, ShoppingCart, Plus, Minus, Trash2, 
   X, CheckCircle2, Truck, AlertCircle, Sparkles, HelpCircle, User,
-  Globe, Landmark, ArrowRight, ShieldCheck, PhoneCall, MessageSquare
+  Globe, Landmark, ArrowRight, ShieldCheck, PhoneCall, MessageSquare,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 
 export default function App() {
@@ -395,6 +396,15 @@ export default function App() {
   const [selectedProductDetails, setSelectedProductDetails] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
+  const [showSupportModal, setShowSupportModal] = useState<boolean>(false);
+  const featureSliderRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollSlider = (direction: "left" | "right") => {
+    if (featureSliderRef.current) {
+      const scrollAmount = direction === "left" ? -280 : 280;
+      featureSliderRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
   const [trackingSearchId, setTrackingSearchId] = useState<string>("");
   const [selectedOrderToTrack, setSelectedOrderToTrack] = useState<Order | null>(null);
   const [orderSuccessDetails, setOrderSuccessDetails] = useState<{ id: string; whatsappUrl: string } | null>(null);
@@ -1529,53 +1539,86 @@ export default function App() {
         </div>
 
         {/* 3. Sub-Navigation JOHURUL.BDShop Blue Category Bar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 pt-3 border-t border-gray-100 hidden md:flex items-center gap-2">
-          <button
-            id="nav-tab-shop"
-            onClick={() => setCurrentView("shop")}
-            className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
-              currentView === "shop"
-                ? "bg-[#3730a3] text-white shadow-sm"
-                : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
-            }`}
-          >
-            🛍️ {lang === "bn" ? "হোম শপ" : "JOHURUL.BDShop Store"}
-          </button>
-          <button
-            id="nav-tab-track"
-            onClick={() => setCurrentView("track")}
-            className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
-              currentView === "track"
-                ? "bg-[#3730a3] text-white shadow-sm"
-                : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
-            }`}
-          >
-            🔍 {lang === "bn" ? "অর্ডার ট্র্যাকিং" : "Order Tracking"}
-          </button>
-          <button
-            id="nav-tab-account"
-            onClick={() => setCurrentView("account")}
-            className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
-              currentView === "account"
-                ? "bg-[#3730a3] text-white shadow-sm"
-                : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
-            }`}
-          >
-            👤 {lang === "bn" ? "আমার অ্যাকাউন্ট" : "My Account"}
-          </button>
-          {showAdminEntryPoints && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 pt-3 border-t border-gray-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
             <button
-              id="nav-tab-admin"
-              onClick={() => setCurrentView("admin")}
-              className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 ${
-                currentView === "admin"
-                  ? "bg-purple-600 text-white shadow-xs"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-purple-600"
+              id="nav-tab-shop"
+              onClick={() => setCurrentView("shop")}
+              className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 shrink-0 ${
+                currentView === "shop"
+                  ? "bg-[#3730a3] text-white shadow-sm"
+                  : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
               }`}
             >
-              🛠️ {lang === "bn" ? "স্টোর অ্যাডমিন" : "Store Admin"}
+              🛍️ {lang === "bn" ? "হোম শপ" : "JOHURUL.BDShop Store"}
             </button>
-          )}
+            <button
+              id="nav-tab-track"
+              onClick={() => setCurrentView("track")}
+              className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 shrink-0 ${
+                currentView === "track"
+                  ? "bg-[#3730a3] text-white shadow-sm"
+                  : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
+              }`}
+            >
+              🔍 {lang === "bn" ? "অর্ডার ট্র্যাকিং" : "Order Tracking"}
+            </button>
+            <button
+              id="nav-tab-account"
+              onClick={() => setCurrentView("account")}
+              className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 shrink-0 ${
+                currentView === "account"
+                  ? "bg-[#3730a3] text-white shadow-sm"
+                  : "text-gray-700 hover:bg-gray-50 hover:text-[#3730a3]"
+              }`}
+            >
+              👤 {lang === "bn" ? "আমার অ্যাকাউন্ট" : "My Account"}
+            </button>
+            {showAdminEntryPoints && (
+              <button
+                id="nav-tab-admin"
+                onClick={() => setCurrentView("admin")}
+                className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 shrink-0 ${
+                  currentView === "admin"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-purple-600"
+                }`}
+              >
+                🛠️ {lang === "bn" ? "স্টোর অ্যাডমিন" : "Store Admin"}
+              </button>
+            )}
+          </div>
+
+          {/* Contact Helpline */}
+          <div className="hidden lg:flex items-center gap-2 text-xs font-bold text-[#3730a3] bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100 shrink-0">
+            <PhoneCall className="w-3.5 h-3.5" />
+            <span>{lang === "bn" ? "হটলাইন:" : "Hotline:"} 01795339373</span>
+          </div>
+        </div>
+
+        {/* 4. Full Width Horizontal Categories Bar (ক্যাটাগরি সমূহ - Full Width Below Nav) */}
+        <div className="bg-[#3730a3] text-white mt-3 py-2.5 px-4 shadow-xs">
+          <div className="max-w-7xl mx-auto flex items-center gap-3 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 shrink-0 pr-3 border-r border-indigo-400/40 text-xs font-black uppercase tracking-wider">
+              <span>📂</span>
+              <span>{lang === "bn" ? "ক্যাটাগরি সমূহ:" : "Categories:"}</span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3.5 py-1 rounded-md text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+                    selectedCategory === cat
+                      ? "bg-white text-[#3730a3] shadow-xs"
+                      : "text-indigo-100 hover:bg-white/15 hover:text-white"
+                  }`}
+                >
+                  {getCategoryDisplayName(cat)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1624,96 +1667,334 @@ export default function App() {
         {currentView === "shop" && (
           <div className="space-y-6">
             
-            {/* Top Grid: Categories Sidebar & Slider */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Left Categories Sidebar (Desktop only) */}
-              <div className="hidden lg:block lg:col-span-1 bg-white rounded-md p-4 border border-gray-100 shadow-xs h-[320px] flex flex-col justify-between">
-                <div className="space-y-1">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest pb-2 mb-2 border-indigo-800 border-gray-100 flex items-center justify-between">
-                    <span>{lang === "bn" ? "ক্যাটাগরি সমূহ" : "Categories"}</span>
-                    <span className="text-[10px] text-[#3730a3] animate-pulse">● LIVE</span>
-                  </h3>
-                  <div className="space-y-0.5">
-                    {categories.map((cat) => (
-                      <button
-                        id={`sidebar-cat-${cat}`}
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`w-full text-left px-3 py-2 rounded text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                          selectedCategory === cat
-                            ? "bg-indigo-50 text-[#3730a3] font-bold"
-                            : "text-gray-600 hover:bg-gray-50 hover:text-[#3730a3]"
-                        }`}
-                      >
-                        <span>{getCategoryDisplayName(cat)}</span>
-                        <span className="text-gray-300 group-hover:text-[#3730a3] text-[10px]">▶</span>
-                      </button>
-                    ))}
+            {/* BDShop Style Vertical Poster Banner Carousel/Slider */}
+            <div className="relative group/slider">
+              {/* Left & Right Carousel Arrow Buttons */}
+              <button
+                onClick={() => scrollSlider("left")}
+                aria-label="Previous Banner"
+                className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-gray-800 p-2.5 rounded-full shadow-lg border border-gray-200 opacity-90 group-hover/slider:opacity-100 transition-all hover:scale-110 cursor-pointer hidden sm:flex items-center justify-center"
+              >
+                <ChevronLeft className="w-5 h-5 text-[#3730a3]" />
+              </button>
+
+              <button
+                onClick={() => scrollSlider("right")}
+                aria-label="Next Banner"
+                className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-gray-800 p-2.5 rounded-full shadow-lg border border-gray-200 opacity-90 group-hover/slider:opacity-100 transition-all hover:scale-110 cursor-pointer hidden sm:flex items-center justify-center"
+              >
+                <ChevronRight className="w-5 h-5 text-[#3730a3]" />
+              </button>
+
+              {/* Slider Container */}
+              <div 
+                ref={featureSliderRef}
+                className="grid grid-flow-col auto-cols-[180px] sm:auto-cols-[210px] md:auto-cols-[230px] lg:auto-cols-[240px] gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5"
+              >
+                {/* 1. Electronics Hub */}
+                <div
+                  onClick={() => {
+                    setSelectedCategory("ইলেকট্রনিক্স");
+                    window.scrollTo({ top: 700, behavior: "smooth" });
+                  }}
+                  className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-gray-900"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=600&q=80"
+                    alt="Electronics Hub"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10"></div>
+                  
+                  <div className="relative z-10 p-3.5">
+                    <span className="bg-[#3730a3] text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-xs uppercase tracking-wider">
+                      {lang === "bn" ? "সুরক্ষিত ওয়েবসাইট" : "Secured Store"}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 p-4 text-white space-y-1">
+                    <h3 className="text-base font-black tracking-tight drop-shadow-sm">
+                      {lang === "bn" ? "সুরক্ষিত ওয়েবসাইট" : "Electronics Hub"}
+                    </h3>
+                    <p className="text-[11px] text-indigo-100 line-clamp-1 font-medium">
+                      {lang === "bn" ? "অরিজিনাল গ্যাজেট ও ইলেকট্রনিক্স" : "Latest gadgets"}
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 pt-1 group-hover:translate-x-1 transition-transform">
+                      {lang === "bn" ? "শপ নাও ➔" : "Shop Now ➔"}
+                    </span>
                   </div>
                 </div>
-                
-                {/* Contact Help banner at bottom of sidebar */}
-                <div className="bg-indigo-50 border border-indigo-100 p-2.5 rounded text-[11px] text-gray-700 flex items-center gap-1.5 font-medium">
-                  <PhoneCall className="w-3.5 h-3.5 text-[#3730a3] shrink-0" />
-                  <div>
-                    <span className="font-bold text-[#3730a3] block">{lang === "bn" ? "সাহায্য প্রয়োজন?" : "Customer Support?"}</span>
-                    <span className="font-bold">01795339373</span>
+
+                {/* 2. Customer Support - WITH JOHURUL'S PORTRAIT PHOTO */}
+                <div
+                  onClick={() => setShowSupportModal(true)}
+                  className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border-2 border-indigo-400/80 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-indigo-950 ring-2 ring-indigo-300/30"
+                >
+                  <img
+                    src="/johurul_support.jpg"
+                    alt="Customer Support - Johurul"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/95 via-indigo-950/35 to-black/20"></div>
+                  
+                  <div className="relative z-10 p-3.5 flex items-center justify-between">
+                    <span className="bg-emerald-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-xs uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                      {lang === "bn" ? "বিশ্বস্ত কাস্টমার সাপোর্ট" : "24/7 SUPPORT"}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 p-4 text-white space-y-1">
+                    <div className="bg-indigo-900/90 backdrop-blur-md border border-indigo-400/40 p-2.5 rounded-xl space-y-1">
+                      <h3 className="text-base font-black tracking-tight text-white flex items-center gap-1.5">
+                        <span>🎧</span>
+                        <span>{lang === "bn" ? "বিশ্বস্ত কাস্টমার সাপোর্ট" : "Customer Support"}</span>
+                      </h3>
+                      <p className="text-[10px] text-indigo-200 font-bold leading-tight">
+                        {lang === "bn" ? "সরাসরি ২৪/৭ হোয়াটসঅ্যাপ সহায়তা পেতে ক্লিক করুন" : "Click for instant WhatsApp support"}
+                      </p>
+                      <div className="pt-1 flex items-center justify-between border-t border-indigo-400/30">
+                        <span className="text-[11px] font-black text-amber-300 font-mono">01795339373</span>
+                        <span className="bg-emerald-500 text-white text-[9px] font-extrabold px-2 py-0.5 rounded group-hover:bg-emerald-400 transition-colors">
+                          {lang === "bn" ? "হোয়াটসঅ্যাপ ➔" : "Chat ➔"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. 100% Authentic Products */}
+                <div
+                  onClick={() => {
+                    setSelectedCategory("সব প্রডাক্ট");
+                    window.scrollTo({ top: 700, behavior: "smooth" });
+                  }}
+                  className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-slate-900"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80"
+                    alt="Authentic Products"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10"></div>
+                  
+                  <div className="relative z-10 p-3.5">
+                    <span className="bg-cyan-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-xs uppercase tracking-wider">
+                      {lang === "bn" ? "১০০% অথেন্টিক প্রোডাক্ট" : "100% Genuine"}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 p-4 text-white space-y-1">
+                    <h3 className="text-base font-black tracking-tight drop-shadow-sm">
+                      {lang === "bn" ? "১০০% অথেন্টিক প্রোডাক্ট" : "Gaming Zone"}
+                    </h3>
+                    <p className="text-[11px] text-cyan-100 line-clamp-1 font-medium">
+                      {lang === "bn" ? "গেমিং গিয়ার ও স্মোর্ট ডিভাইস" : "Gaming gear"}
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-300 pt-1 group-hover:translate-x-1 transition-transform">
+                      {lang === "bn" ? "এক্সপ্লোর করুন ➔" : "Discover ➔"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Best Offers in Bangladesh */}
+                <div
+                  onClick={() => {
+                    setSelectedCategory("অ্যাক্সেসরিজ");
+                    window.scrollTo({ top: 700, behavior: "smooth" });
+                  }}
+                  className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-rose-950"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80"
+                    alt="Best Offers"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10"></div>
+                  
+                  <div className="relative z-10 p-3.5">
+                    <span className="bg-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-xs uppercase tracking-wider">
+                      {lang === "bn" ? "বাংলাদেশের সেরা অফার" : "Best Offers"}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 p-4 text-white space-y-1">
+                    <h3 className="text-base font-black tracking-tight drop-shadow-sm">
+                      {lang === "bn" ? "বাংলাদেশের সেরা অফার" : "Audio Paradise"}
+                    </h3>
+                    <p className="text-[11px] text-rose-100 line-clamp-1 font-medium">
+                      {lang === "bn" ? "সাউন্ড সিস্টেম ও এয়ারবাড" : "Sound systems"}
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-300 pt-1 group-hover:translate-x-1 transition-transform">
+                      {lang === "bn" ? "অফার দেখুন ➔" : "Listen ➔"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Fast Delivery Across BD */}
+                <div
+                  onClick={() => {
+                    setSelectedCategory("সব প্রডাক্ট");
+                    window.scrollTo({ top: 700, behavior: "smooth" });
+                  }}
+                  className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-amber-950"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=600&q=80"
+                    alt="Fast Delivery"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10"></div>
+                  
+                  <div className="relative z-10 p-3.5">
+                    <span className="bg-amber-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-xs uppercase tracking-wider">
+                      {lang === "bn" ? "দ্রুত ডেলিভারি" : "Fast Delivery"}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 p-4 text-white space-y-1">
+                    <h3 className="text-base font-black tracking-tight drop-shadow-sm">
+                      {lang === "bn" ? "প্রত্যন্ত অঞ্চলে দ্রুত ডেলিভারি" : "Mobile World"}
+                    </h3>
+                    <p className="text-[11px] text-amber-100 line-clamp-1 font-medium">
+                      {lang === "bn" ? "সারাদেশে ক্যাশ অন ডেলিভারি" : "Cash on delivery BD"}
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 pt-1 group-hover:translate-x-1 transition-transform">
+                      {lang === "bn" ? "ব্রাউজ করুন ➔" : "Browse ➔"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 6. Top Brands */}
+                <div
+                  onClick={() => {
+                    setSelectedCategory("সব প্রডাক্ট");
+                    window.scrollTo({ top: 700, behavior: "smooth" });
+                  }}
+                  className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-blue-950"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=600&q=80"
+                    alt="Top Brands"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10"></div>
+                  
+                  <div className="relative z-10 p-3.5">
+                    <span className="bg-blue-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-xs uppercase tracking-wider">
+                      {lang === "bn" ? "সেরা ব্র্যান্ড" : "Top Brands"}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 p-4 text-white space-y-1">
+                    <h3 className="text-base font-black tracking-tight drop-shadow-sm">
+                      {lang === "bn" ? "সেরা ব্র্যান্ডের পণ্য" : "Computing Power"}
+                    </h3>
+                    <p className="text-[11px] text-blue-100 line-clamp-1 font-medium">
+                      {lang === "bn" ? "অফিসিয়াল ওয়ারেন্টি প্রডাক্ট" : "Laptops & Computing"}
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-300 pt-1 group-hover:translate-x-1 transition-transform">
+                      {lang === "bn" ? "সব দেখুন ➔" : "View All ➔"}
+                    </span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Right Big Hero Slider Banner */}
-              <div className="lg:col-span-3 bg-gradient-to-r from-[#3730a3] to-[#1e1b4b] rounded-md p-6 sm:p-10 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-center justify-between min-h-[320px] gap-6">
-                {/* Aesthetic Background Overlays */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent)] pointer-events-none"></div>
-                <div className="absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
-                
-                <div className="space-y-3.5 max-w-xl flex-1 z-10">
-                  <span className="inline-block text-[9px] font-extrabold tracking-widest uppercase bg-white/20 text-white px-2.5 py-1 rounded-sm border border-white/20">
-                    🔥 {lang === "bn" ? "জহুরুল বিডি-শপ অরিজিনাল ডিলস" : "BDSHOP PREMIUM DEALS"}
+            {/* Full Width Top 5 Showcase Products Grid (Image + Price + Title + Order Now) */}
+            <div className="space-y-3.5 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🔥</span>
+                  <h3 className="text-base font-extrabold text-gray-900 tracking-tight">
+                    {lang === "bn" ? "সেরা ৫টি পপুলার প্রোডাক্ট (Top 5 Best Deals)" : "Top 5 Popular Products"}
+                  </h3>
+                  <span className="text-[10px] font-black bg-indigo-50 text-[#3730a3] px-2 py-0.5 rounded border border-indigo-100">
+                    {lang === "bn" ? "ছবি ও দাম সহ" : "With Image & Price"}
                   </span>
-                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
-                    {lang === "bn" ? "১০০% অরিজিনাল গ্যাজেটস ক্যাশ অন ডেলিভারি অফারে!" : "100% Original Gadgets & Electronics in Bangladesh!"}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-indigo-100 font-medium max-w-md">
-                    {lang === "bn" 
-                      ? "কোনো অগ্রিম চার্জ ছাড়াই অর্ডার করুন এবং হাতে পেয়ে চেক করে পেমেন্ট করার সুবিধা উপভোগ করুন। নিশ্চিত থাকুন আসল পণ্যের।" 
-                      : "Zero upfront risk. Place cash on delivery orders, inspect items on your hand, and track live in our system."}
-                  </p>
+                </div>
+              </div>
 
-                  {/* Promo Code Coupon Voucher Badge */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-white/10 mt-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="bg-white text-[#3730a3] px-4 py-1.5 rounded font-black text-lg tracking-wider font-mono shadow-xs">
-                        FB20
+              {/* 5-Column Full-Width Poster Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
+                {products.slice(0, 5).map((prod, idx) => {
+                  const displayPrice = prod.isFlashSale && prod.flashSalePrice ? prod.flashSalePrice : prod.price;
+                  const originalPrice = prod.originalPrice || Math.round(displayPrice * 1.25);
+                  const pName = lang === "bn" ? prod.banglaName || prod.name : prod.name;
+
+                  return (
+                    <div
+                      key={prod.id || idx}
+                      onClick={() => setSelectedProductDetails(prod)}
+                      className="group bg-white rounded-2xl border border-gray-150 p-3 shadow-xs hover:shadow-xl hover:border-indigo-300 transition-all duration-300 flex flex-col justify-between relative cursor-pointer overflow-hidden"
+                    >
+                      {/* Top Rank Badge */}
+                      <div className="absolute top-2.5 left-2.5 z-10 bg-[#3730a3] text-white text-[9px] font-black px-2 py-0.5 rounded-md shadow-sm">
+                        TOP #{idx + 1}
                       </div>
-                      <div className="text-xs">
-                        <span className="font-extrabold block text-white">{lang === "bn" ? "ফেসবুক অ্যাড স্পেশাল ২০% ডিসকাউন্ট!" : "FB Ads Special 20% Off"}</span>
-                        <span className="text-indigo-200 text-[10px]">{lang === "bn" ? "চেকআউট পেজে কুপনটি ব্যবহার করুন" : "Apply coupon code in checkout to save instantly"}</span>
+
+                      {/* Flash Sale / Discount Badge */}
+                      {prod.isFlashSale && (
+                        <div className="absolute top-2.5 right-2.5 z-10 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md shadow-sm animate-pulse">
+                          SALE
+                        </div>
+                      )}
+
+                      {/* Product Image */}
+                      <div className="aspect-square w-full rounded-xl overflow-hidden bg-slate-50 border border-gray-100 mb-3 relative group-hover:scale-105 transition-transform duration-500">
+                        <img
+                          src={prod.image}
+                          alt={prod.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover object-center"
+                        />
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-1.5 flex-1 flex flex-col justify-between">
+                        <div>
+                          <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 block w-max uppercase">
+                            {prod.category}
+                          </span>
+                          <h4 className="text-xs font-black text-gray-900 line-clamp-2 mt-1 group-hover:text-[#3730a3] transition-colors leading-snug">
+                            {pName}
+                          </h4>
+                        </div>
+
+                        <div className="pt-2 border-t border-dashed border-gray-150 space-y-2">
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-base font-black text-[#3730a3] font-mono">
+                              ৳{displayPrice}
+                            </span>
+                            {originalPrice > displayPrice && (
+                              <span className="text-xs font-bold text-gray-400 line-through font-mono">
+                                ৳{originalPrice}
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOrderNow(prod);
+                            }}
+                            className="w-full bg-[#3730a3] hover:bg-indigo-900 text-white font-extrabold text-[11px] py-2 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <span>🛒</span>
+                            <span>{lang === "bn" ? "অর্ডার করুন" : "Order Now"}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    
-                    <button 
-                      onClick={() => {
-                        setCouponCode("FB20");
-                        alert(lang === "bn" ? "ভাউচার কোড 'FB20' যোগ করা হয়েছে!" : "Coupon 'FB20' applied successfully!");
-                      }}
-                      className="bg-white text-[#3730a3] hover:bg-indigo-50 px-5 py-2 rounded font-extrabold text-xs tracking-wider shadow-md hover:scale-105 transition-all cursor-pointer"
-                    >
-                      {lang === "bn" ? "ভাউচার কপি করুন" : "CLAIM VOUCHER"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Banner Image Container */}
-                <div className="w-full md:w-[240px] lg:w-[280px] aspect-video md:aspect-square bg-black/20 rounded-xl overflow-hidden border border-white/10 relative shrink-0 shadow-lg z-10 flex items-center justify-center">
-                  <img
-                    src={heroImageUrl}
-                    alt="Premium Watch Banner"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover object-center transform hover:scale-110 transition-transform duration-700"
-                  />
-                </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -2869,6 +3150,94 @@ export default function App() {
               {lang === "bn" 
                 ? "* হোয়াটসঅ্যাপে অর্ডার কনফার্ম করলে আপনার কুরিয়ার প্রসেসিং আরও দ্রুত হবে।" 
                 : "* WhatsApp verification ensures faster shipping processing."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 24/7 CUSTOMER SUPPORT POPUP MODAL */}
+      {showSupportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative space-y-4 border border-indigo-100 animate-scale-up text-center">
+            
+            {/* Close button */}
+            <button
+              onClick={() => setShowSupportModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 bg-gray-100 p-2 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header Badge */}
+            <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-black">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              <span>{lang === "bn" ? "বিশ্বস্ত কাস্টমার সাপোর্ট" : "Trusted Customer Support"}</span>
+            </div>
+
+            {/* Support Manager Image Frame */}
+            <div className="w-28 h-28 mx-auto rounded-full p-1 bg-gradient-to-tr from-[#3730a3] to-emerald-400 shadow-lg relative">
+              <img
+                src="/johurul_support.jpg"
+                alt="Totini Customer Support Manager"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover rounded-full"
+              />
+              <span className="absolute bottom-1 right-1 bg-emerald-500 text-white p-1 rounded-full border-2 border-white text-xs shadow-xs">
+                ✅
+              </span>
+            </div>
+
+            {/* Name and Designation */}
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">
+                {lang === "bn" ? "জহুরুল বিডি-শপ কাস্টমার কেয়ার" : "JOHURUL.BDShop Care"}
+              </h3>
+              <p className="text-xs text-gray-500 font-bold">
+                {lang === "bn" ? "আপনার যেকোনো সহায়তার জন্য আমরা প্রস্তুত" : "Always here to assist your online order"}
+              </p>
+            </div>
+
+            {/* Hotline number box */}
+            <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3 space-y-1">
+              <span className="text-[10px] font-extrabold text-indigo-800 uppercase tracking-wider block">
+                {lang === "bn" ? "অফিসিয়াল হটলাইন ও হোয়াটসঅ্যাপ নম্বর" : "Official Helpline & WhatsApp"}
+              </span>
+              <p className="text-xl font-black text-[#3730a3] font-mono tracking-wider">
+                01795339373
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <a
+                href={`https://wa.me/8801795339373?text=${encodeURIComponent(
+                  lang === "bn"
+                    ? "আসসালামু আলাইকুম, আমি জহুরুল বিডি-শপ থেকে প্রোডাক্ট বা অর্ডার সংক্রান্ত তথ্য জানতে চাই।"
+                    : "Hello, I need assistance regarding my order at JOHURUL BDShop."
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setShowSupportModal(false)}
+                className="w-full bg-[#25D366] hover:bg-[#20ba56] text-white font-black py-3.5 px-4 rounded-xl shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02]"
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="text-xs font-black">
+                  {lang === "bn" ? "সরাসরি হোয়াটসঅ্যাপে চ্যাট করুন" : "Chat on WhatsApp Now"}
+                </span>
+              </a>
+
+              <a
+                href="tel:01795339373"
+                onClick={() => setShowSupportModal(false)}
+                className="w-full bg-[#3730a3] hover:bg-indigo-900 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span>{lang === "bn" ? "সরাসরি ফোন কল করুন (01795339373)" : "Call Directly (01795339373)"}</span>
+              </a>
+            </div>
+
+            <p className="text-[10px] text-gray-400 pt-1">
+              {lang === "bn" ? "সকাল ৯টা - রাত ১১টা পর্যন্ত প্রতিনিয়ত সার্ভিস চালু রয়েছে।" : "Available daily from 9:00 AM to 11:00 PM."}
             </p>
           </div>
         </div>
