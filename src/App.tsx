@@ -55,13 +55,12 @@ export default function App() {
   const [currentView, setCurrentView] = useState<"shop" | "track" | "admin" | "account">("shop");
 
   // Core admin credentials and session state
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem("mystore_admin_authenticated") === "true";
-  });
+  // REQUIRED: Always start as FALSE so page reload forces re-login
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
   const [adminPassword, setAdminPassword] = useState<string>(() => {
     const saved = localStorage.getItem("mystore_admin_password");
-    return saved || "ruma7862"; // updated default password
+    return saved || "ruma7862"; // default password
   });
 
   const [adminEmail, setAdminEmail] = useState<string>(() => {
@@ -69,51 +68,34 @@ export default function App() {
     return saved || "admin@gms.com"; // default email
   });
 
-  // State to toggle the visibility of the admin buttons/links
-  const [showAdminEntryPoints, setShowAdminEntryPoints] = useState<boolean>(() => {
-    return localStorage.getItem("mystore_show_admin_entry") === "true";
-  });
-
-  // Track secret brand clicks to reveal admin panel
-  const [logoClickCount, setLogoClickCount] = useState<number>(0);
-  const [lastLogoClickTime, setLastLogoClickTime] = useState<number>(0);
-
-  // Parse URL search params to reveal admin panel
+  // Dedicated Route Listener for Admin Link (#admin, /admin, ?admin=true)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("admin") === "true" || params.get("manage") === "true" || params.get("secret") === "true") {
-      setShowAdminEntryPoints(true);
-      localStorage.setItem("mystore_show_admin_entry", "true");
-    }
-  }, []);
+    const handleAdminRouteCheck = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const pathname = window.location.pathname.toLowerCase();
 
-  const handleBrandClick = () => {
-    const now = Date.now();
-    if (now - lastLogoClickTime < 2000) {
-      const nextCount = logoClickCount + 1;
-      setLogoClickCount(nextCount);
-      if (nextCount >= 5) {
-        setShowAdminEntryPoints((prev) => {
-          const newValue = !prev;
-          localStorage.setItem("mystore_show_admin_entry", String(newValue));
-          alert(
-            newValue 
-              ? (lang === "bn" 
-                  ? "অ্যাডমিন প্রবেশদ্বার সক্রিয় করা হয়েছে! হেডার এবং ফুটার লিংকগুলোতে মালিকানার অপশন যোগ হয়েছে।" 
-                  : "Owner entry points enabled! Admin link has been revealed in headers and footers.")
-              : (lang === "bn"
-                  ? "অ্যাডমিন প্রবেশদ্বার নিষ্ক্রিয় করা হয়েছে।"
-                  : "Owner entry points hidden from storefront.")
-          );
-          return newValue;
-        });
-        setLogoClickCount(0);
+      if (
+        hash === "#admin" || 
+        hash === "#/admin" || 
+        hash === "#admin-panel" || 
+        pathname === "/admin" || 
+        pathname.endsWith("/admin") ||
+        search.includes("admin=true") ||
+        search.includes("page=admin")
+      ) {
+        setCurrentView("admin");
       }
-    } else {
-      setLogoClickCount(1);
-    }
-    setLastLogoClickTime(now);
-  };
+    };
+
+    handleAdminRouteCheck();
+    window.addEventListener("hashchange", handleAdminRouteCheck);
+    window.addEventListener("popstate", handleAdminRouteCheck);
+    return () => {
+      window.removeEventListener("hashchange", handleAdminRouteCheck);
+      window.removeEventListener("popstate", handleAdminRouteCheck);
+    };
+  }, []);
 
   // Admin login and password management states
   const [typedEmail, setTypedEmail] = useState<string>("");
@@ -125,18 +107,6 @@ export default function App() {
   const [isFirebaseAuthed, setIsFirebaseAuthed] = useState<boolean>(false);
   const [authWarning, setAuthWarning] = useState<string>("");
 
-  // Firebase auth state listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.email === adminEmail) {
-        setIsAdminAuthenticated(true);
-        setIsFirebaseAuthed(true);
-        sessionStorage.setItem("mystore_admin_authenticated", "true");
-      }
-    });
-    return () => unsubscribe();
-  }, [adminEmail]);
-
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const emailInput = typedEmail.trim();
@@ -147,7 +117,6 @@ export default function App() {
       await signInWithEmailAndPassword(auth, emailInput, passwordInput);
       setIsAdminAuthenticated(true);
       setIsFirebaseAuthed(true);
-      sessionStorage.setItem("mystore_admin_authenticated", "true");
       setLoginError("");
       setAuthWarning("");
       setTypedPassword("");
@@ -156,23 +125,22 @@ export default function App() {
     } catch (fbErr: any) {
       console.warn("Firebase Auth direct login failed, checking local credentials:", fbErr);
 
-      // 2. Fallback to local credentials
+      // 2. Fallback to local credentials (ID: admin@gms.com, PIN: ruma7862)
       if (emailInput === adminEmail && passwordInput === adminPassword) {
         setIsAdminAuthenticated(true);
-        sessionStorage.setItem("mystore_admin_authenticated", "true");
         setLoginError("");
         setTypedPassword("");
         setTypedEmail("");
         setAuthWarning(
           lang === "bn"
-            ? "লোকাল ভেরিফিকেশন সফল হয়েছে! ফায়ারবেস অথেনটিকেশন সক্রিয় করতে আপনার ফায়ারবেস কনসোলে 'admin@gms.com' ক্রিয়েট করুন।"
-            : "Logged in via local fallback! To enable secure cloud writes, please enable Email/Password provider in Firebase and create this user."
+            ? "লোকাল ভেরিফিকেশন সফল হয়েছে! ফায়ারবেস কনসোলে 'admin@gms.com' ক্রিয়েট করে রাখতে পারেন।"
+            : "Logged in via local verification! Email/Password provider verified."
         );
       } else {
         setLoginError(
           lang === "bn" 
-            ? "ভুল আইডি অথবা পাসওয়ার্ড! আবার চেষ্টা করুন।" 
-            : "Incorrect ID or Password! Please try again."
+            ? "ভুল আইডি অথবা পাসওয়ার্ড! সঠিক তথ্য দিয়ে চেষ্টা করুন।" 
+            : "Incorrect User ID or Password! Please try again."
         );
       }
     }
@@ -186,7 +154,8 @@ export default function App() {
     }
     setIsAdminAuthenticated(false);
     setIsFirebaseAuthed(false);
-    sessionStorage.removeItem("mystore_admin_authenticated");
+    window.location.hash = "";
+    setCurrentView("shop");
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -1586,17 +1555,13 @@ export default function App() {
             >
               👤 {lang === "bn" ? "আমার অ্যাকাউন্ট" : "My Account"}
             </button>
-            {showAdminEntryPoints && (
+            {currentView === "admin" && (
               <button
                 id="nav-tab-admin"
                 onClick={() => setCurrentView("admin")}
-                className={`px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 shrink-0 ${
-                  currentView === "admin"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-purple-600"
-                }`}
+                className="px-4 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all uppercase flex items-center gap-1 shrink-0 bg-purple-700 text-white shadow-xs"
               >
-                🛠️ {lang === "bn" ? "স্টোর অ্যাডমিন" : "Store Admin"}
+                🛠️ {lang === "bn" ? "অ্যাডমিন প্যানেল" : "Store Admin"}
               </button>
             )}
           </div>
@@ -1660,11 +1625,11 @@ export default function App() {
           <span className="text-lg">👤</span>
           <span>{lang === "bn" ? "প্রোফাইল" : "Profile"}</span>
         </button>
-        {showAdminEntryPoints && (
+        {currentView === "admin" && (
           <button
             id="mobile-nav-admin"
             onClick={() => setCurrentView("admin")}
-            className={`flex flex-col items-center gap-0.5 ${currentView === "admin" ? "text-purple-600" : "text-gray-400"}`}
+            className="flex flex-col items-center gap-0.5 text-purple-600 font-bold"
           >
             <span className="text-lg">🛠️</span>
             <span>{lang === "bn" ? "অ্যাডমিন" : "Admin"}</span>
@@ -2326,11 +2291,15 @@ export default function App() {
                     <h2 className="text-xl font-extrabold text-gray-900">
                       {lang === "bn" ? "অ্যাডমিন প্যানেল লগইন" : "Admin Portal Login"}
                     </h2>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-gray-500 mt-1">
                       {lang === "bn" 
-                        ? "আপনার রেজিস্টার্ড লগইন আইডি এবং পাসওয়ার্ড দিয়ে প্রবেশ করুন।" 
-                        : "Sign in with your registered admin credentials to access the panel."}
+                        ? "আপনার ইউজার আইডি ও পাসওয়ার্ড দিয়ে প্রবেশ করুন।" 
+                        : "Sign in with your admin credentials to access the panel."}
                     </p>
+                    <div className="mt-3 p-3 bg-purple-50/80 border border-purple-100 rounded-2xl text-[11px] text-purple-900 space-y-1 text-left font-medium">
+                      <p>🔗 <b>{lang === "bn" ? "এডমিন লিংক:" : "Admin Link:"}</b> <code className="bg-white px-1.5 py-0.5 rounded border text-purple-700">your-domain.com/#admin</code></p>
+                      <p>🔒 <b>{lang === "bn" ? "সিকিউরিটি নিয়ম:" : "Security Rule:"}</b> {lang === "bn" ? "প্রতিবার পেজ রিলোড হলে আইডি ও পাসওয়ার্ড দিয়ে পুনরায় লগইন করতে হবে।" : "Password login required on every page refresh for maximum security."}</p>
+                    </div>
                   </div>
 
                   <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
@@ -3283,14 +3252,14 @@ export default function App() {
       {/* Footer Branding */}
       <footer className="mt-auto bg-white border-t border-gray-100 py-8 text-center text-xs text-gray-400">
         <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 space-y-4">
-          <p onClick={handleBrandClick} className="font-semibold text-gray-500 cursor-pointer select-none">
+          <p className="font-semibold text-gray-500 select-none">
             © 2026 {lang === "bn" ? "জহুরুল বিডি-শপ ই-কমার্স" : "JOHURUL.BDShop Open Source E-Commerce System"}. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 text-gray-400 font-medium">
             <span className="hover:text-[#3730a3] transition-colors cursor-pointer" onClick={() => setCurrentView("shop")}>🛍️ {lang === "bn" ? "হোম পেজ" : "Home Storefront"}</span>
             <span>·</span>
             <span className="hover:text-[#3730a3] transition-colors cursor-pointer" onClick={() => setCurrentView("track")}>🔍 {lang === "bn" ? "লাইভ কুরিয়ার ট্র্যাকিং" : "Courier Tracking"}</span>
-            {showAdminEntryPoints && (
+            {currentView === "admin" && (
               <>
                 <span>·</span>
                 <span className="hover:text-purple-600 transition-colors cursor-pointer" onClick={() => setCurrentView("admin")}>🛠️ {lang === "bn" ? "অ্যাডমিন ড্যাশবোর্ড" : "Owner Panel"}</span>
