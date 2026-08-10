@@ -38,6 +38,7 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
   // Real human-like TTS Voice States
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
+  const [voiceSpeedRate, setVoiceSpeedRate] = useState<number>(0.92); // 0.92x natural human pace with breath pauses
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -141,7 +142,7 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
       subtitleBn: `🔥 টিকটকে এই ভাইরাল প্রোডাক্টটা অবশেষে পেয়ে গেলাম! মাত্র ৳${selectedProduct?.price}!`,
       subtitleEn: `🔥 Finally got this viral TikTok product! Only ৳${selectedProduct?.price}!`,
       bgEffect: "scale-110 duration-5000 brightness-90 saturate-120",
-      vocalBn: `ফেসবুক আর টিকটকে এই অরিজিনাল ভাইরাল প্রোডাক্টটা এতবার দেখেছি যে শেষমেশ কিনেই ফেললাম! মাত্র ${selectedProduct?.price} টাকা!`,
+      vocalBn: `ফেসবুক আর টিকটকে, এই অরিজিনাল ভাইরাল প্রোডাক্টটা এতবার দেখেছি যে, শেষমেশ কিনেই ফেললাম! মাত্র ${selectedProduct?.price} টাকা!`,
       vocalEn: "Okay, so I've been seeing this product all over my FYP, and I finally gave in and ordered it!"
     },
     {
@@ -149,7 +150,7 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
       subtitleBn: `✨ ১০০% অরিজিনাল প্রিমিয়াম কোয়ালিটি ও চমৎকার বিল্ড ফিনিশিং।`,
       subtitleEn: `✨ 100% Original premium build quality & sleek finish.`,
       bgEffect: "translate-x-3 translate-y-2 scale-105 duration-10000 brightness-75",
-      vocalBn: "এর বিল্ড কোয়ালিটি এবং ফিনিশিং জাস্ট চমৎকার! দৈনন্দিন ব্যবহারের জন্য এটি অত্যন্ত আরামদায়ক এবং টেকসই।",
+      vocalBn: "এর বিল্ড কোয়ালিটি, এবং ফিনিশিং... জাস্ট চমৎকার! দৈনন্দিন ব্যবহারের জন্য, এটি অত্যন্ত আরামদায়ক, এবং টেকসই।",
       vocalEn: "The premium design is absolutely beautiful. It makes your daily routine so seamless and comfortable."
     },
     {
@@ -157,7 +158,7 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
       subtitleBn: `🚚 সারা বাংলাদেশে দ্রুত ক্যাশ অন ডেলিভারি ও লাইভ কুরিয়ার ট্র্যাকিং!`,
       subtitleEn: `🚚 Super-fast Cash on Delivery nationwide with live tracking maps!`,
       bgEffect: "scale-115 -rotate-1 duration-8000 brightness-50",
-      vocalBn: "সবচেয়ে ভালো লেগেছে এদের দ্রুত ক্যাশ অন ডেলিভারি এবং লাইভ কুরিয়ার ট্র্যাকিং সুবিধা! ঘরে বসেই ট্র্যাক করা যায়।",
+      vocalBn: "সবচেয়ে ভালো লেগেছে এদের দ্রুত ক্যাশ অন ডেলিভারি, এবং লাইভ কুরিয়ার ট্র্যাকিং সুবিধা! ঘরে বসেই ট্র্যাক করা যায়।",
       vocalEn: "The best part is their interactive live courier tracking and reliable cash on delivery. Track your parcel easily!"
     },
     {
@@ -165,7 +166,7 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
       subtitleBn: `🎁 ২০% স্পেশাল ডিসকাউন্ট পেতে এখনই 'Shop Now' বাটনে ক্লিক করুন!`,
       subtitleEn: `🎁 Click the 'Shop Now' button below right now to claim 20% OFF!`,
       bgEffect: "scale-100 animate-pulse brightness-90",
-      vocalBn: "সীমিত সময়ের বিশেষ ২০ পারসেন্ট ডিসকাউন্ট পেতে এখনই নিচের শপ নাও বাটনে ক্লিক করে আপনার অর্ডার কনফার্ম করুন!",
+      vocalBn: "সীমিত সময়ের বিশেষ ২০ পারসেন্ট ডিসকাউন্ট পেতে, এখনই নিচের শপ নাও বাটনে ক্লিক করে, আপনার অর্ডার কনফার্ম করুন!",
       vocalEn: "Click the Shop Now button right now to secure yours with a special twenty percent discount today!"
     }
   ];
@@ -222,8 +223,8 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
       playbackIntervalRef.current = setInterval(() => {
         setCurrentTime((prev) => {
           let nextTime = prev + 1;
-          if (nextTime > 30) {
-            nextTime = 0; // Loop
+          if (nextTime >= 25) {
+            nextTime = 0; // Loop at 25 seconds
             window.speechSynthesis.cancel();
           }
           return nextTime;
@@ -276,10 +277,9 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
       }
     }
 
-    // Set more natural human rate and pitch
-    const isNatural = selectedVoiceName.toLowerCase().includes("natural") || selectedVoiceName.toLowerCase().includes("online");
-    utterance.rate = isNatural ? 1.0 : (campaignLanguage === "bengali" ? 1.1 : 1.0);
-    utterance.pitch = isNatural ? 1.0 : 1.05;
+    // Set natural, relaxed human speech rate with breathing rhythm (0.92x default)
+    utterance.rate = voiceSpeedRate || 0.92;
+    utterance.pitch = 1.0;
 
     speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
@@ -994,7 +994,7 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
               )}
             </select>
 
-            <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-2.5 space-y-1">
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-2.5 space-y-2">
               <p className="text-[10px] text-indigo-900 font-extrabold flex items-start gap-1 leading-normal">
                 <span>💡</span>
                 <span>
@@ -1003,6 +1003,37 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
                     : "Tip: For breathtakingly realistic, professional human speech, open this app in 'Microsoft Edge' or 'Google Chrome' and choose the 'Premium Natural' or 'Nabanita' voice profile."}
                 </span>
               </p>
+
+              {/* Voice Speed Rate Selector Buttons */}
+              <div className="pt-1.5 border-t border-indigo-100/60 flex flex-wrap items-center justify-between gap-1.5">
+                <span className="text-[10px] font-black text-slate-800">
+                  {lang === "bn" ? "🔊 কথা বলার গতি (Voice Speed):" : "🔊 Speech Pace Rate:"}
+                </span>
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {[
+                    { rate: 0.85, labelBn: "0.85x ধীর", labelEn: "0.85x Slow" },
+                    { rate: 0.92, labelBn: "0.92x মানুষের মতো (দম সহ)", labelEn: "0.92x Natural Human" },
+                    { rate: 1.0, labelBn: "1.0x স্বাভাবিক", labelEn: "1.0x Normal" },
+                    { rate: 1.1, labelBn: "1.1x দ্রুত", labelEn: "1.1x Fast" }
+                  ].map((s) => (
+                    <button
+                      key={s.rate}
+                      type="button"
+                      onClick={() => {
+                        setVoiceSpeedRate(s.rate);
+                        if (isPlaying) playSceneSpeech(currentSlideIndex);
+                      }}
+                      className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all cursor-pointer whitespace-nowrap ${
+                        voiceSpeedRate === s.rate
+                          ? "bg-indigo-900 text-white shadow-2xs"
+                          : "bg-white border border-indigo-100 hover:bg-indigo-100 text-indigo-900"
+                      }`}
+                    >
+                      {lang === "bn" ? s.labelBn : s.labelEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
