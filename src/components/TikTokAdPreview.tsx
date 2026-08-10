@@ -101,9 +101,9 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
   const [likesCount, setLikesCount] = useState<number>(10352);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
-  // 30s AI Video Rendering Simulation State
+  // 25s AI Video Rendering Simulation State
   const [activeViewMode, setActiveViewMode] = useState<"script" | "ai_video" | "adsense">("ai_video");
-  const [videoDuration, setVideoDuration] = useState<number>(30); // 30s fixed
+  const [videoDuration, setVideoDuration] = useState<number>(25); // 25s fixed duration
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -134,38 +134,38 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
   const appUrl = typeof window !== "undefined" ? window.location.origin : "https://mystore.com";
   const campaignLink = `${appUrl}/?product=${selectedProduct?.id}&coupon=TT20&ref=tiktok_campaign&creator=${tiktokUsername.replace("@", "")}`;
 
-  // Pre-configured automated script slideshow scenes
+  // Pre-configured automated script slideshow scenes - Exactly 25 Seconds Total
   const slideScenes = [
     {
       timeRange: [0, 6],
       subtitleBn: `🔥 টিকটকে এই ভাইরাল প্রোডাক্টটা অবশেষে পেয়ে গেলাম! মাত্র ৳${selectedProduct?.price}!`,
       subtitleEn: `🔥 Finally got this viral TikTok product! Only ৳${selectedProduct?.price}!`,
       bgEffect: "scale-110 duration-5000 brightness-90 saturate-120",
-      vocalBn: "ফেসবুক আর টিকটকে এই প্রোডাক্টটা এতবার দেখেছি যে শেষমেশ কিনেই ফেললাম! আর সত্যি বলতে এটি অসাধারণ!",
-      vocalEn: "Okay, so I've been seeing this product all over my FYP, and I finally gave in and ordered it! And honestly, it lives up to the hype."
+      vocalBn: `ফেসবুক আর টিকটকে এই অরিজিনাল ভাইরাল প্রোডাক্টটা এতবার দেখেছি যে শেষমেশ কিনেই ফেললাম! মাত্র ${selectedProduct?.price} টাকা!`,
+      vocalEn: "Okay, so I've been seeing this product all over my FYP, and I finally gave in and ordered it!"
     },
     {
-      timeRange: [6, 16],
-      subtitleBn: `✨ প্রিমিয়াম ফিনিশ এবং দুর্দান্ত বিল্ড কোয়ালিটি। আপনার প্রতিদিনের কাজ সহজ করবে!`,
-      subtitleEn: `✨ Premium finish and outstanding build quality. Makes your daily life easier!`,
+      timeRange: [6, 13],
+      subtitleBn: `✨ ১০০% অরিজিনাল প্রিমিয়াম কোয়ালিটি ও চমৎকার বিল্ড ফিনিশিং।`,
+      subtitleEn: `✨ 100% Original premium build quality & sleek finish.`,
       bgEffect: "translate-x-3 translate-y-2 scale-105 duration-10000 brightness-75",
-      vocalBn: "এর প্রিমিয়াম কোয়ালিটি ও ফিনিশিং সত্যিই চমৎকার! এটি আপনার দৈনন্দিন লাইফকে অনেক সহজ এবং আরামদায়ক করবে।",
+      vocalBn: "এর বিল্ড কোয়ালিটি এবং ফিনিশিং জাস্ট চমৎকার! দৈনন্দিন ব্যবহারের জন্য এটি অত্যন্ত আরামদায়ক এবং টেকসই।",
       vocalEn: "The premium design is absolutely beautiful. It makes your daily routine so seamless and comfortable."
     },
     {
-      timeRange: [16, 24],
-      subtitleBn: `🚚 সারা বাংলাদেশে দ্রুত ক্যাশ অন ডেলিভারি এবং লাইভ কুরিয়ার ট্র্যাকিং সুবিধা!`,
-      subtitleEn: `🚚 Super-fast Cash on Delivery nationwide with live courier tracking maps!`,
+      timeRange: [13, 19],
+      subtitleBn: `🚚 সারা বাংলাদেশে দ্রুত ক্যাশ অন ডেলিভারি ও লাইভ কুরিয়ার ট্র্যাকিং!`,
+      subtitleEn: `🚚 Super-fast Cash on Delivery nationwide with live tracking maps!`,
       bgEffect: "scale-115 -rotate-1 duration-8000 brightness-50",
-      vocalBn: "সবচেয়ে ভালো লেগেছে এদের লাইভ অর্ডার ট্র্যাকিং আর ক্যাশ অন ডেলিভারি সুবিধা! ঘরে বসেই ট্র্যাক করুন!",
+      vocalBn: "সবচেয়ে ভালো লেগেছে এদের দ্রুত ক্যাশ অন ডেলিভারি এবং লাইভ কুরিয়ার ট্র্যাকিং সুবিধা! ঘরে বসেই ট্র্যাক করা যায়।",
       vocalEn: "The best part is their interactive live courier tracking and reliable cash on delivery. Track your parcel easily!"
     },
     {
-      timeRange: [24, 30],
-      subtitleBn: `🎁 স্পেশাল ২০% ডিসকাউন্ট পেতে এখনই নিচের 'Shop Now' বাটনে ক্লিক করুন!`,
-      subtitleEn: `🎁 Click the 'Shop Now' button below to claim your special 20% discount!`,
+      timeRange: [19, 25],
+      subtitleBn: `🎁 ২০% স্পেশাল ডিসকাউন্ট পেতে এখনই 'Shop Now' বাটনে ক্লিক করুন!`,
+      subtitleEn: `🎁 Click the 'Shop Now' button below right now to claim 20% OFF!`,
       bgEffect: "scale-100 animate-pulse brightness-90",
-      vocalBn: "বিশেষ ২০ পারসেন্ট অফার পেতে আজই নিচের শপ নাও বাটনে ক্লিক করে সরাসরি অর্ডার করুন!",
+      vocalBn: "সীমিত সময়ের বিশেষ ২০ পারসেন্ট ডিসকাউন্ট পেতে এখনই নিচের শপ নাও বাটনে ক্লিক করে আপনার অর্ডার কনফার্ম করুন!",
       vocalEn: "Click the Shop Now button right now to secure yours with a special twenty percent discount today!"
     }
   ];
@@ -492,7 +492,7 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
     return adCopy.substring(0, 160) + "...";
   };
 
-  // Generate and download 9:16 Vertical TikTok Video File (.webm / .mp4)
+  // Generate and download 9:16 Vertical TikTok Video File (.webm / .mp4) - 25s Duration
   const generateAndDownloadVideo = async () => {
     if (!selectedProduct) return;
     setIsDownloadingVideo(true);
@@ -504,18 +504,54 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas context unavailable");
 
-      // Load Product Image
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = sceneImages[currentSlideIndex] || selectedProduct.image;
+      // Preload image cache for 4 scenes
+      const loadedImages: HTMLImageElement[] = await Promise.all(
+        slideScenes.map(async (_, idx) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = sceneImages[idx] || selectedProduct.image;
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+          return img;
+        })
+      );
 
-      await new Promise((resolve) => {
-        img.onload = resolve;
-        img.onerror = resolve;
-      });
+      // Set up AudioContext & MediaStreamAudioDestinationNode for audio capturing
+      let audioCtx: AudioContext | null = null;
+      let audioStream: MediaStream | null = null;
+      let oscNode: OscillatorNode | null = null;
 
-      // Stream canvas to MediaRecorder
-      const stream = canvas.captureStream(30);
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+          const dest = audioCtx.createMediaStreamDestination();
+          audioStream = dest.stream;
+
+          // Ambient melodic tone beat for background
+          oscNode = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
+          oscNode.type = "sine";
+          oscNode.frequency.setValueAtTime(220, audioCtx.currentTime);
+          oscNode.connect(gainNode);
+          gainNode.connect(dest);
+          oscNode.start();
+        }
+      } catch (e) {
+        console.warn("Web Audio API stream capture setup notice:", e);
+      }
+
+      // Stream canvas + audio to MediaRecorder
+      const canvasStream = canvas.captureStream(30);
+      const tracks = [...canvasStream.getVideoTracks()];
+      if (audioStream && audioStream.getAudioTracks().length > 0) {
+        tracks.push(...audioStream.getAudioTracks());
+      }
+      const combinedStream = new MediaStream(tracks);
+
       let mimeType = "video/webm";
       if (typeof MediaRecorder !== "undefined") {
         if (MediaRecorder.isTypeSupported("video/mp4")) {
@@ -525,7 +561,7 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
         }
       }
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = new MediaRecorder(combinedStream, { mimeType });
       const chunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (e) => {
@@ -533,12 +569,19 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
       };
 
       mediaRecorder.onstop = () => {
+        if (oscNode) {
+          try { oscNode.stop(); } catch (e) {}
+        }
+        if (audioCtx) {
+          try { audioCtx.close(); } catch (e) {}
+        }
+
         const ext = mimeType.includes("mp4") ? "mp4" : "webm";
         const blob = new Blob(chunks, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `tiktok_ad_${selectedProduct.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}.${ext}`;
+        a.download = `tiktok_ad_25s_${selectedProduct.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}.${ext}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -546,8 +589,8 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
         setIsDownloadingVideo(false);
 
         const msg = lang === "bn"
-          ? "✅ ভিডিও ডাউনলোড সম্পন্ন! এবার টিকটকে সিলেক্ট করে পোস্ট করুন।"
-          : "✅ Video download completed! Select file on TikTok to upload.";
+          ? "✅ ২৫ সেকেন্ডের ভিডিও ও ভয়েসডাউনলোড সম্পন্ন! এবার টিকটকে আপলোড করুন।"
+          : "✅ 25s Video & Voice download completed! Open TikTok Studio to upload.";
         setPublishToast(msg);
         setTimeout(() => setPublishToast(null), 5000);
       };
@@ -555,63 +598,133 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
       mediaRecorder.start();
 
       let frame = 0;
-      const totalFrames = 90; // ~3 seconds recording
+      const totalFrames = 750; // Exactly 25 seconds at 30 fps
+      let lastSpokenScene = -1;
+
+      // Helper function to wrap text neatly on Canvas
+      const drawWrappedText = (
+        text: string,
+        x: number,
+        y: number,
+        maxWidth: number,
+        lineHeight: number
+      ) => {
+        const words = text.split(" ");
+        let line = "";
+        let currentY = y;
+
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line + words[n] + " ";
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && n > 0) {
+            ctx.fillText(line, x, currentY);
+            line = words[n] + " ";
+            currentY += lineHeight;
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, x, currentY);
+      };
+
       const interval = setInterval(() => {
         frame++;
+        const currentSec = Math.floor(frame / 30);
 
-        // Canvas Background
-        ctx.fillStyle = "#0f172a";
+        // Determine current scene index (0, 1, 2, 3)
+        let activeSceneIdx = slideScenes.findIndex(
+          (s) => currentSec >= s.timeRange[0] && currentSec < s.timeRange[1]
+        );
+        if (activeSceneIdx === -1) activeSceneIdx = 3;
+
+        // Speak Voiceover aloud at scene transition points
+        if (activeSceneIdx !== lastSpokenScene) {
+          lastSpokenScene = activeSceneIdx;
+          if (!isMuted) playSceneSpeech(activeSceneIdx);
+        }
+
+        const currentImg = loadedImages[activeSceneIdx] || loadedImages[0];
+
+        // 1. Dark Slate Background
+        ctx.fillStyle = "#090d16";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Animated product image zoom
-        if (img.complete && img.naturalWidth > 0) {
-          const scale = 1 + (frame / totalFrames) * 0.12;
+        // 2. Animated Product Image Zoom
+        if (currentImg && currentImg.complete && currentImg.naturalWidth > 0) {
+          const sceneFrame = frame % 180;
+          const scale = 1 + (sceneFrame / 180) * 0.08;
           const w = canvas.width * scale;
           const h = canvas.height * scale;
           const x = (canvas.width - w) / 2;
           const y = (canvas.height - h) / 2;
-          ctx.drawImage(img, x, y, w, h);
+          ctx.drawImage(currentImg, x, y, w, h);
         }
 
-        // Dark gradient overlay
+        // 3. Dark Gradient Overlay for Maximum Legibility
         const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        grad.addColorStop(0, "rgba(0,0,0,0.5)");
-        grad.addColorStop(0.6, "rgba(0,0,0,0.2)");
+        grad.addColorStop(0, "rgba(0,0,0,0.55)");
+        grad.addColorStop(0.5, "rgba(0,0,0,0.25)");
         grad.addColorStop(1, "rgba(0,0,0,0.95)");
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Offer badge
+        // 4. Offer Badge Pill
         ctx.fillStyle = "#e11d48";
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(30, 80, 220, 50, 25);
-        else ctx.rect(30, 80, 220, 50);
+        if (ctx.roundRect) ctx.roundRect(35, 70, 260, 52, 26);
+        else ctx.rect(35, 70, 260, 52);
         ctx.fill();
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 20px sans-serif";
-        ctx.fillText("⚡ 20% OFF TODAY", 45, 112);
+        ctx.font = "bold 22px sans-serif";
+        ctx.fillText("⚡ ২০% ডিসকাউন্ট অফার", 52, 103);
 
-        // Caption box
-        ctx.fillStyle = "rgba(0,0,0,0.75)";
+        // 5. Price Tag Badge
+        ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(30, canvas.height - 250, canvas.width - 60, 110, 16);
-        else ctx.rect(30, canvas.height - 250, canvas.width - 60, 110);
+        if (ctx.roundRect) ctx.roundRect(canvas.width - 240, 70, 205, 52, 26);
+        else ctx.rect(canvas.width - 240, 70, 205, 52);
         ctx.fill();
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 24px sans-serif";
+        ctx.fillText(`৳ ${selectedProduct.price}`, canvas.width - 215, 103);
+
+        // 6. Beautiful Subtitle Box with Wrapped Bengali Text
+        ctx.fillStyle = "rgba(0, 0, 0, 0.82)";
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(35, canvas.height - 320, canvas.width - 70, 160, 20);
+        else ctx.rect(35, canvas.height - 320, canvas.width - 70, 160);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
 
         ctx.fillStyle = "#facc15";
-        ctx.font = "bold 22px sans-serif";
-        const captionText = campaignLanguage === "bengali" 
-          ? slideScenes[currentSlideIndex]?.subtitleBn || selectedProduct.name
-          : slideScenes[currentSlideIndex]?.subtitleEn || selectedProduct.name;
-        ctx.fillText(captionText.substring(0, 42), 45, canvas.height - 185);
+        ctx.font = 'bold 26px "Kalpurush", "SolaimanLipi", "Segoe UI", sans-serif';
+        const activeSubtitle = campaignLanguage === "bengali"
+          ? slideScenes[activeSceneIdx]?.subtitleBn || selectedProduct.name
+          : slideScenes[activeSceneIdx]?.subtitleEn || selectedProduct.name;
 
-        // Creator Handle and Price
+        drawWrappedText(activeSubtitle, 55, canvas.height - 275, canvas.width - 110, 36);
+
+        // 7. TikTok Creator Handle & Product Title
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 26px sans-serif";
-        ctx.fillText(`${tiktokUsername}`, 45, canvas.height - 90);
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 22px sans-serif";
-        ctx.fillText(`৳${selectedProduct.price} - ${selectedProduct.name.substring(0, 28)}`, 45, canvas.height - 55);
+        ctx.font = "bold 28px sans-serif";
+        ctx.fillText(`${tiktokUsername}`, 40, canvas.height - 110);
+
+        ctx.fillStyle = "#cbd5e1";
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText(`${selectedProduct.name.substring(0, 32)} • ৳${selectedProduct.price}`, 40, canvas.height - 75);
+
+        // 8. 25-Second Animated Timeline Progress Bar
+        ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+        ctx.fillRect(0, canvas.height - 12, canvas.width, 12);
+
+        const progressRatio = frame / totalFrames;
+        ctx.fillStyle = "#22d3ee";
+        ctx.fillRect(0, canvas.height - 12, canvas.width * progressRatio, 12);
 
         if (frame >= totalFrames) {
           clearInterval(interval);
@@ -1449,29 +1562,79 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
           </div>
         )}
 
-        {/* RENDER VIEW: FULL COPYWRITING SCRIPT */}
+        {/* RENDER VIEW: FULL COPYWRITING SCRIPT & 1-CLICK CAPTION BOX */}
         {activeViewMode === "script" && (
-          <div className="bg-slate-50 border border-gray-200/60 rounded-3xl p-6 text-left space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-150 pb-3">
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-purple-600" />
-                {lang === "bn" ? "টিকটক এআই স্ক্রিপ্ট কপিরাইটিং" : "Full Copywriting & Video Blueprint"}
-              </h4>
-              <button
-                onClick={() => {
-                  copyToClipboard(adCopy, "text");
-                  setCopiedScript(true);
-                  setTimeout(() => setCopiedScript(false), 2000);
-                }}
-                className="bg-white hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-700 font-bold flex items-center gap-1 transition-all cursor-pointer"
-              >
-                <Copy className="w-3.5 h-3.5 text-slate-700" />
-                <span>{copiedScript ? (lang === "bn" ? "কপি হয়েছে!" : "Copied!") : (lang === "bn" ? "স্ক্রিপ্ট কপি করুন" : "Copy Complete Script")}</span>
-              </button>
+          <div className="space-y-4">
+            {/* 1-CLICK DIRECT TIKTOK POST CAPTION COPY CARD */}
+            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 border border-rose-500/40 rounded-3xl p-6 text-left text-white space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
+                    📋
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                      {lang === "bn" ? "টিকটক পোস্ট ক্যাপশন ও বিবরণ (Copy Description)" : "TikTok Post Caption & Bio Description"}
+                    </h4>
+                    <p className="text-[10px] text-gray-300">
+                      {lang === "bn" ? "সরাসরি কপি করে টিকটকে পেস্ট করুন" : "1-click copy & paste directly into TikTok Studio"}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const postCaption = getCaptionOnly() || `TikTok made me buy it! 😱 অবশেষে পেয়ে গেলাম আসল "${selectedProduct?.name}"।\n💰 প্রোডাক্ট প্রাইস: ৳${selectedProduct?.price} (২০% ডিসকাউন্ট!)\n\n✨ বৈশিষ্ট্যসমূহ:\n• ১০০% অরিজিনাল প্রোডাক্ট\n• সারা বাংলাদেশে ক্যাশ অন ডেলিভারি\n• লাইভ অর্ডার ট্র্যাকিং লিংক সুবিধা\n\n🛒 অর্ডার লিংক: ${campaignLink}\n#tiktokmademebuyit #foryoupage #viral #bangladesh #onlineshopping #foryou`;
+                    copyToClipboard(postCaption, "text");
+                    setCopiedText(true);
+                    setTimeout(() => setCopiedText(false), 2500);
+                  }}
+                  className="bg-gradient-to-r from-rose-500 to-cyan-500 hover:from-rose-400 hover:to-cyan-400 text-white font-black text-xs px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5 shrink-0 active:scale-95"
+                >
+                  <Copy className="w-4 h-4 text-white" />
+                  <span>{copiedText ? (lang === "bn" ? "✅ ক্যাপশন কপি হয়েছে!" : "✅ Copied!") : (lang === "bn" ? "📋 ক্যাপশন কপি করুন" : "📋 Copy Caption")}</span>
+                </button>
+              </div>
+
+              {/* Ready Description Preview Box */}
+              <div className="bg-black/60 backdrop-blur-xs rounded-2xl p-4 border border-white/10 text-xs font-sans text-amber-200 leading-relaxed whitespace-pre-line font-medium select-all">
+                {getCaptionOnly() || `TikTok made me buy it! 😱 অবশেষে পেয়ে গেলাম আসল "${selectedProduct?.name}"।
+💰 প্রোডাক্ট প্রাইস: ৳${selectedProduct?.price} (২০% ডিসকাウント!)
+
+✨ বৈশিষ্ট্যসমূহ:
+• ১০০% অরিজিনাল ব্রান্ড নিউ প্রোডাক্ট
+• সারা বাংলাদেশে ক্যাশ অন ডেলিভারি
+• লাইভ অর্ডার ট্র্যাকিং লিংক সুবিধা
+
+🛒 অর্ডার লিংক: ${campaignLink}
+#tiktokmademebuyit #foryoupage #viral #bangladesh #onlineshopping #foryou`}
+              </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 min-h-[300px] shadow-2xs font-mono text-xs text-gray-700 whitespace-pre-line leading-relaxed">
-              {adCopy || (lang === "bn" ? "এআই স্ক্রিপ্ট জেনারেট হচ্ছে..." : "Generating Copy blueprint...")}
+            {/* FULL VIDEO SCRIPT BLUEPRINT */}
+            <div className="bg-slate-50 border border-gray-200/60 rounded-3xl p-6 text-left space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-150 pb-3">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  {lang === "bn" ? "২৫ সেকেন্ড ভিডিও শুটিং ও ভয়েস স্ক্রিপ্ট" : "25s Video Shooting & Voice Blueprint"}
+                </h4>
+                <button
+                  onClick={() => {
+                    copyToClipboard(adCopy, "text");
+                    setCopiedScript(true);
+                    setTimeout(() => setCopiedScript(false), 2000);
+                  }}
+                  className="bg-white hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-700 font-bold flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5 text-slate-700" />
+                  <span>{copiedScript ? (lang === "bn" ? "কপি হয়েছে!" : "Copied!") : (lang === "bn" ? "সম্পূর্ণ স্ক্রিপ্ট কপি" : "Copy Full Blueprint")}</span>
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 min-h-[250px] shadow-2xs font-mono text-xs text-gray-700 whitespace-pre-line leading-relaxed">
+                {adCopy || (lang === "bn" ? "এআই স্ক্রিপ্ট জেনারেট হচ্ছে..." : "Generating Copy blueprint...")}
+              </div>
             </div>
           </div>
         )}
