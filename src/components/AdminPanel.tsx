@@ -514,9 +514,11 @@ export default function AdminPanel({
 
   // Product actions
   const handleDeleteProduct = (productId: string) => {
-    if (window.confirm(lang === "bn" ? "আপনি কি নিশ্চিতভাবে এই প্রোডাক্টটি ডিলিট করতে চান?" : "Are you sure you want to delete this product?")) {
-      const updatedProducts = products.filter(p => p.id !== productId);
-      onUpdateProducts(updatedProducts);
+    const updatedProducts = products.filter(p => p.id !== productId);
+    onUpdateProducts(updatedProducts);
+    if (editingProduct?.id === productId) {
+      setIsEditingProduct(false);
+      setEditingProduct(null);
     }
   };
 
@@ -585,7 +587,16 @@ export default function AdminPanel({
     if (editingProduct.id) {
       // Edit
       const updatedProducts = products.map((p) => 
-        p.id === editingProduct.id ? (editingProduct as Product) : p
+        p.id === editingProduct.id
+          ? ({
+              ...p,
+              ...editingProduct,
+              price: Number(editingProduct.price),
+              originalPrice: editingProduct.originalPrice ? Number(editingProduct.originalPrice) : p.originalPrice,
+              stock: editingProduct.stock !== undefined ? Number(editingProduct.stock) : p.stock,
+              costPrice: editingProduct.costPrice ? Number(editingProduct.costPrice) : p.costPrice
+            } as Product)
+          : p
       );
       onUpdateProducts(updatedProducts);
     } else {
@@ -2323,15 +2334,28 @@ export default function AdminPanel({
                               </td>
 
                               <td className="py-4 text-right pr-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setPrintingOrder(order)}
-                                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 text-[10px] font-black py-2 px-3 rounded-xl border border-emerald-100 transition-all inline-flex items-center gap-1 cursor-pointer shadow-xs"
-                                  title={lang === "bn" ? "অর্ডার স্লিপ / ইনভয়েস প্রিন্ট" : "Generate Printable Invoice"}
-                                >
-                                  <Printer className="w-3.5 h-3.5" />
-                                  <span>{lang === "bn" ? "রসিদ" : "Slip"}</span>
-                                </button>
+                                <div className="flex justify-end items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPrintingOrder(order)}
+                                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 text-[10px] font-black py-2 px-2.5 rounded-xl border border-emerald-100 transition-all inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                                    title={lang === "bn" ? "অর্ডার স্লিপ / ইনভয়েস প্রিন্ট" : "Generate Printable Invoice"}
+                                  >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span>{lang === "bn" ? "রসিদ" : "Slip"}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = orders.filter(o => o.id !== order.id);
+                                      onUpdateOrders(updated);
+                                    }}
+                                    className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 p-2 rounded-xl border border-red-100 transition-all cursor-pointer shadow-xs"
+                                    title={lang === "bn" ? "অর্ডার ডিলিট করুন" : "Delete Order"}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -2350,7 +2374,7 @@ export default function AdminPanel({
       {activeTab === "products" && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-indigo-900lue-600ase font-bold text-gray-800">
+            <h3 className="text-base font-bold text-gray-800">
               {lang === "bn" ? "প্রোডাক্ট ক্যাটালগ এডিটর" : "Product Catalog & Inventory"}
             </h3>
             <button
@@ -2958,13 +2982,13 @@ export default function AdminPanel({
                       </div>
                     </td>
                     <td className="py-3.5 text-xs">
-                      <span className="bg-indigo-50 text-red-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-800lue-100">
+                      <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-100">
                         {p.category}
                       </span>
                     </td>
                     <td className="py-3.5 font-bold">৳{p.price}</td>
                     <td className="py-3.5">
-                      <span className={`text-xs ${p.stock <= 5 ? "text-indigo-900lue-600lue-500 font-bold" : "text-gray-600"}`}>
+                      <span className={`text-xs ${p.stock <= 5 ? "text-red-600 font-bold" : "text-gray-600"}`}>
                         {p.stock} pcs
                       </span>
                     </td>
@@ -2976,7 +3000,7 @@ export default function AdminPanel({
                             setEditingProduct(p);
                             setIsEditingProduct(true);
                           }}
-                          className="p-1.5 hover:bg-gray-100 text-indigo-600 rounded-lg"
+                          className="p-1.5 hover:bg-indigo-50 text-indigo-600 hover:text-indigo-800 rounded-lg cursor-pointer transition-colors"
                           title="Edit"
                         >
                           <Edit3 className="w-4 h-4" />
@@ -2984,7 +3008,7 @@ export default function AdminPanel({
                         <button
                           id={`delete-prod-${p.id}`}
                           onClick={() => handleDeleteProduct(p.id)}
-                          className="p-1.5 hover:bg-indigo-50 text-indigo-900lue-600lue-500 rounded-lg"
+                          className="p-1.5 hover:bg-red-50 text-red-600 hover:text-red-700 rounded-lg cursor-pointer transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -3561,30 +3585,27 @@ export default function AdminPanel({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const confirmed = window.confirm(lang === "bn" ? "আপনি কি এই কার্টটিকে একটি কনফার্মড অর্ডারে রুপান্তর করতে চান?" : "Convert this abandoned cart into a live order?");
-                                  if (confirmed) {
-                                    const mockOrder: Order = {
-                                      id: rec.id.replace("AB-", ""),
-                                      customerName: rec.name,
-                                      customerPhone: rec.phone,
-                                      customerAddress: "Mymensingh Town, Bangladesh",
-                                      customerThana: "Mymensingh Sadar",
-                                      customerDistrict: "Mymensingh",
-                                      customerDivision: "Mymensingh",
-                                      cartItems: [{
-                                        product: products[0] || { id: "p1", name: "Recovered Item", price: rec.amount, image: "", description: "", category: "General", stock: 100, rating: 5, reviewsCount: 12 },
-                                        quantity: 1
-                                      }],
-                                      totalAmount: rec.amount,
-                                      paymentMethod: "cod",
-                                      status: OrderStatus.RECEIVED,
-                                      createdAt: new Date().toISOString(),
-                                      trackingHistory: createDefaultTrackingHistory()
-                                    };
-                                    onUpdateOrders([mockOrder, ...orders]);
-                                    setAbandonedOrders(abandonedOrders.map(a => a.id === rec.id ? { ...a, status: "Recovered" } : a));
-                                    alert(lang === "bn" ? "সফলভাবে কার্ট অর্ডার কনভার্ট করা হয়েছে!" : "Cart converted to active order successfully!");
-                                  }
+                                  const mockOrder: Order = {
+                                    id: rec.id.replace("AB-", ""),
+                                    customerName: rec.name,
+                                    customerPhone: rec.phone,
+                                    customerAddress: "Mymensingh Town, Bangladesh",
+                                    customerThana: "Mymensingh Sadar",
+                                    customerDistrict: "Mymensingh",
+                                    customerDivision: "Mymensingh",
+                                    cartItems: [{
+                                      product: products[0] || { id: "p1", name: "Recovered Item", price: rec.amount, image: "", description: "", category: "General", stock: 100, rating: 5, reviewsCount: 12 },
+                                      quantity: 1
+                                    }],
+                                    totalAmount: rec.amount,
+                                    paymentMethod: "cod",
+                                    status: OrderStatus.RECEIVED,
+                                    createdAt: new Date().toISOString(),
+                                    trackingHistory: createDefaultTrackingHistory()
+                                  };
+                                  onUpdateOrders([mockOrder, ...orders]);
+                                  setAbandonedOrders(abandonedOrders.map(a => a.id === rec.id ? { ...a, status: "Recovered" } : a));
+                                  alert(lang === "bn" ? "সফলভাবে কার্ট অর্ডার কনভার্ট করা হয়েছে!" : "Cart converted to active order successfully!");
                                 }}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer shadow-sm animate-pulse"
                               >
@@ -4018,10 +4039,8 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(lang === "bn" ? "আপনি কি এই কুপনটি ডিলিট করতে চান?" : "Are you sure you want to delete this coupon?")) {
-                                  if (onUpdateCoupons) {
-                                    onUpdateCoupons(coupons.filter(c => c.id !== coupon.id));
-                                  }
+                                if (onUpdateCoupons) {
+                                  onUpdateCoupons(coupons.filter(c => c.id !== coupon.id));
                                 }
                               }}
                               className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
@@ -4091,8 +4110,33 @@ export default function AdminPanel({
                         <h4 className="font-bold text-gray-900 text-sm">{cat.name}</h4>
                         <span className="text-[10px] text-gray-400 font-mono">Slug: /{cat.slug}</span>
                       </div>
-                      <div className="bg-indigo-50 text-[#3730a3] border border-indigo-100 text-[10px] font-black px-2.5 py-1 rounded-full">
-                        {actualCount > 0 ? actualCount : cat.count} products
+                      <div className="flex items-center gap-2">
+                        <div className="bg-indigo-50 text-[#3730a3] border border-indigo-100 text-[10px] font-black px-2.5 py-1 rounded-full">
+                          {actualCount > 0 ? actualCount : cat.count} products
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newName = prompt(lang === "bn" ? "ক্যাটাগরির নতুন নাম লিখুন:" : "Enter new category name:", cat.name);
+                            if (newName && newName.trim()) {
+                              setCategories(categories.map(c => c.id === cat.id ? { ...c, name: newName.trim(), slug: newName.trim().toLowerCase().replace(/\s+/g, "-") } : c));
+                            }
+                          }}
+                          className="p-1.5 hover:bg-indigo-100 text-indigo-700 rounded-lg cursor-pointer transition-colors"
+                          title="Edit Category"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCategories(categories.filter(c => c.id !== cat.id));
+                          }}
+                          className="p-1.5 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer transition-colors"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -4158,17 +4202,27 @@ export default function AdminPanel({
               <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{lang === "bn" ? "লেখক ও কিউরেটর প্রোফাইল" : "Store Curators & Authors Directory"}</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {authors.map((auth) => (
-                  <div key={auth.id} className="bg-slate-50 border border-gray-100 rounded-2xl p-4 flex gap-3 hover:bg-indigo-50/20 transition-all font-sans">
-                    <img
-                      src={auth.image}
-                      alt={auth.name}
-                      className="w-12 h-12 rounded-full object-cover shrink-0 border-2 border-white shadow-sm"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div>
-                      <h4 className="font-extrabold text-gray-900 text-sm">{auth.name}</h4>
-                      <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{auth.bio}</p>
+                  <div key={auth.id} className="bg-slate-50 border border-gray-100 rounded-2xl p-4 flex items-start justify-between hover:bg-indigo-50/20 transition-all font-sans">
+                    <div className="flex gap-3">
+                      <img
+                        src={auth.image}
+                        alt={auth.name}
+                        className="w-12 h-12 rounded-full object-cover shrink-0 border-2 border-white shadow-sm"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div>
+                        <h4 className="font-extrabold text-gray-900 text-sm">{auth.name}</h4>
+                        <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{auth.bio}</p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setAuthors(authors.filter(a => a.id !== auth.id))}
+                      className="p-1.5 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer transition-colors shrink-0"
+                      title="Delete Author"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -4237,7 +4291,8 @@ export default function AdminPanel({
                       <th className="pb-3">BRAND ID</th>
                       <th className="pb-3">NAME / BRAND</th>
                       <th className="pb-3">HUB LOCATION</th>
-                      <th className="pb-3 text-right">TOTAL ITEMS</th>
+                      <th className="pb-3 text-[#3730a3]">TOTAL ITEMS</th>
+                      <th className="pb-3 text-right">ACTION</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
@@ -4246,7 +4301,17 @@ export default function AdminPanel({
                         <td className="py-3 font-mono font-bold text-slate-500">{pub.id}</td>
                         <td className="py-3 text-gray-900 font-extrabold">{pub.name}</td>
                         <td className="py-3 text-gray-500 font-semibold">📍 {pub.location}</td>
-                        <td className="py-3 text-right font-bold text-[#3730a3]">{pub.productsCount} catalog items</td>
+                        <td className="py-3 font-bold text-[#3730a3]">{pub.productsCount} catalog items</td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setPublishers(publishers.filter(p => p.id !== pub.id))}
+                            className="p-1.5 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer transition-colors"
+                            title="Delete Publisher"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -4681,18 +4746,27 @@ export default function AdminPanel({
                           <span className="bg-green-50 text-green-700 font-bold text-[9px] px-2.5 py-0.5 rounded-full border border-green-100">{u.status}</span>
                         </td>
                         <td className="py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const confirmed = window.confirm(`Reset credentials for ${u.email}?`);
-                              if (confirmed) {
-                                  alert("Simulation: A verification PIN reset link has been dispatched.");
-                              }
-                            }}
-                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-2 py-1 rounded text-[10px] cursor-pointer"
-                          >
-                            Reset credentials
-                          </button>
+                          <div className="flex justify-end items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                alert(`Reset link dispatched for ${u.email}`);
+                              }}
+                              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors"
+                            >
+                              Reset credentials
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAdminUsers(adminUsers.filter((_, idx) => idx !== i));
+                              }}
+                              className="p-1 hover:bg-red-50 text-red-600 rounded cursor-pointer transition-colors"
+                              title="Delete Staff"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -5450,18 +5524,27 @@ export default function AdminPanel({
                           <span className="bg-green-50 text-green-700 font-bold text-[9px] px-2.5 py-0.5 rounded-full border border-green-100">{u.status}</span>
                         </td>
                         <td className="py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const confirmed = window.confirm(`Reset credentials for ${u.email}?`);
-                              if (confirmed) {
-                                alert("Simulation: A verification PIN reset link has been dispatched.");
-                              }
-                            }}
-                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-2 py-1 rounded text-[10px] cursor-pointer"
-                          >
-                            Reset credentials
-                          </button>
+                          <div className="flex justify-end items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                alert(`Reset link dispatched for ${u.email}`);
+                              }}
+                              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors"
+                            >
+                              Reset credentials
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAdminUsers(adminUsers.filter((_, idx) => idx !== i));
+                              }}
+                              className="p-1 hover:bg-red-50 text-red-600 rounded cursor-pointer transition-colors"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

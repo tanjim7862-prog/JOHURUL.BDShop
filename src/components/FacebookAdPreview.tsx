@@ -269,7 +269,7 @@ Why Choose Our "${productName}"?
             {/* Simulated Post Content */}
             <div className="px-4 pb-3">
               {error && (
-                <div className="bg-indigo-50 border border-indigo-800lue-100 text-indigo-900lue-600lue-600 rounded-lg p-3 text-xs flex items-start gap-2">
+                <div className="bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg p-3 text-xs flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <p>{error}</p>
                 </div>

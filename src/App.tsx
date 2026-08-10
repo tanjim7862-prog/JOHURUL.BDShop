@@ -825,7 +825,19 @@ export default function App() {
   const filteredProducts = useMemo(() => {
     const sourceProducts = semanticSearchResults !== null ? semanticSearchResults : products;
     const result = sourceProducts.filter((p) => {
-      const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+      const isAllCategory =
+        !selectedCategory ||
+        selectedCategory === "All" ||
+        selectedCategory === "সব প্রডাক্ট" ||
+        selectedCategory === "সব প্রোডাক্ট" ||
+        selectedCategory === "All Products";
+
+      const matchesCategory =
+        isAllCategory ||
+        p.category === selectedCategory ||
+        p.category.toLowerCase() === selectedCategory.toLowerCase() ||
+        (getCategoryDisplayName(p.category) && getCategoryDisplayName(p.category).toLowerCase().includes(selectedCategory.toLowerCase())) ||
+        selectedCategory.toLowerCase().includes(p.category.toLowerCase());
       
       const term = searchQuery.toLowerCase();
       // If we are using semantic search results, we don't need secondary text filter because AI already filtered it!
@@ -1440,7 +1452,7 @@ export default function App() {
     <div className="min-h-screen bg-[#f8f9fa] font-sans text-gray-900 flex flex-col antialiased">
       {/* 1. JOHURUL.BDShop Topbar (টপবার) */}
       <div className="bg-[#222222] text-xs text-white py-2 border-indigo-900/30 hidden md:block">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center font-medium">
+        <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex justify-between items-center font-medium">
           <div className="flex items-center gap-5 text-gray-200">
             <span className="flex items-center gap-1 hover:text-[#3730a3] cursor-pointer transition-colors">
               <PhoneCall className="w-3.5 h-3.5 text-[#3730a3]" />
@@ -1485,7 +1497,7 @@ export default function App() {
 
       {/* 2. JOHURUL.BDShop-style Search Header & Brand Row */}
       <header className="sticky top-0 bg-white border-indigo-800 border-gray-200 z-30 shadow-sm py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
           
           {/* Logo in JOHURUL.BDShop Blue & Charcoal Style */}
           <div 
@@ -1497,7 +1509,7 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-baseline gap-0.5">
-                <h1 className="text-indigo-900lue-600xl font-black tracking-tight leading-none text-[#222222]">
+                <h1 className="text-2xl font-black tracking-tight leading-none text-[#222222]">
                   <span className="text-[#3730a3]">JOHURUL</span>.BDShop
                 </h1>
                 <span className="text-[10px] font-black text-white bg-[#3730a3] px-1.5 py-0.5 rounded-xs uppercase tracking-wider ml-1">
@@ -1539,7 +1551,7 @@ export default function App() {
         </div>
 
         {/* 3. Sub-Navigation JOHURUL.BDShop Blue Category Bar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 pt-3 border-t border-gray-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 mt-4 pt-3 border-t border-gray-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
             <button
               id="nav-tab-shop"
@@ -1597,8 +1609,8 @@ export default function App() {
         </div>
 
         {/* 4. Full Width Horizontal Categories Bar (ক্যাটাগরি সমূহ - Full Width Below Nav) */}
-        <div className="bg-[#3730a3] text-white mt-3 py-2.5 px-4 shadow-xs">
-          <div className="max-w-7xl mx-auto flex items-center gap-3 overflow-x-auto no-scrollbar">
+        <div className="bg-[#3730a3] text-white mt-3 py-2.5 px-4 sm:px-6 lg:px-8 xl:px-10 shadow-xs">
+          <div className="max-w-[1800px] w-full mx-auto flex items-center gap-3 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1.5 shrink-0 pr-3 border-r border-indigo-400/40 text-xs font-black uppercase tracking-wider">
               <span>📂</span>
               <span>{lang === "bn" ? "ক্যাটাগরি সমূহ:" : "Categories:"}</span>
@@ -1661,7 +1673,7 @@ export default function App() {
       </div>
 
       {/* Main Page Layout Wrapper */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 space-y-6">
+      <main className="flex-1 max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 pb-24 md:pb-12 space-y-6">
         
         {/* VIEW 1: SHOP STOREFRONT */}
         {currentView === "shop" && (
@@ -1694,13 +1706,16 @@ export default function App() {
                 {/* 1. Electronics Hub */}
                 <div
                   onClick={() => {
-                    setSelectedCategory("ইলেকট্রনিক্স");
-                    window.scrollTo({ top: 700, behavior: "smooth" });
+                    setSelectedCategory("All");
+                    setSearchQuery("");
+                    setSemanticSearchResults(null);
+                    const elem = document.getElementById("just-for-you-anchor");
+                    if (elem) elem.scrollIntoView({ behavior: "smooth" });
                   }}
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-gray-900"
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=600&q=80"
+                    src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80"
                     alt="Electronics Hub"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
@@ -1721,19 +1736,19 @@ export default function App() {
                       {lang === "bn" ? "অরিজিনাল গ্যাজেট ও ইলেকট্রনিক্স" : "Latest gadgets"}
                     </p>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 pt-1 group-hover:translate-x-1 transition-transform">
-                      {lang === "bn" ? "শপ নাও ➔" : "Shop Now ➔"}
+                      {lang === "bn" ? "সব প্রোডাক্ট দেখুন ➔" : "View All Products ➔"}
                     </span>
                   </div>
                 </div>
 
-                {/* 2. Customer Support - WITH JOHURUL'S PORTRAIT PHOTO */}
+                {/* 2. Customer Support - WITH TOTINI PORTRAIT PHOTO */}
                 <div
                   onClick={() => setShowSupportModal(true)}
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border-2 border-indigo-400/80 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-indigo-950 ring-2 ring-indigo-300/30"
                 >
                   <img
                     src="/johurul_support.jpg"
-                    alt="Customer Support - Johurul"
+                    alt="Customer Support"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700 ease-out"
                   />
@@ -1768,13 +1783,16 @@ export default function App() {
                 {/* 3. 100% Authentic Products */}
                 <div
                   onClick={() => {
-                    setSelectedCategory("সব প্রডাক্ট");
-                    window.scrollTo({ top: 700, behavior: "smooth" });
+                    setSelectedCategory("All");
+                    setSearchQuery("");
+                    setSemanticSearchResults(null);
+                    const elem = document.getElementById("just-for-you-anchor");
+                    if (elem) elem.scrollIntoView({ behavior: "smooth" });
                   }}
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-slate-900"
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80"
+                    src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80"
                     alt="Authentic Products"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
@@ -1795,7 +1813,7 @@ export default function App() {
                       {lang === "bn" ? "গেমিং গিয়ার ও স্মোর্ট ডিভাইস" : "Gaming gear"}
                     </p>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-300 pt-1 group-hover:translate-x-1 transition-transform">
-                      {lang === "bn" ? "এক্সপ্লোর করুন ➔" : "Discover ➔"}
+                      {lang === "bn" ? "সব প্রোডাক্ট দেখুন ➔" : "Discover All ➔"}
                     </span>
                   </div>
                 </div>
@@ -1803,13 +1821,16 @@ export default function App() {
                 {/* 4. Best Offers in Bangladesh */}
                 <div
                   onClick={() => {
-                    setSelectedCategory("অ্যাক্সেসরিজ");
-                    window.scrollTo({ top: 700, behavior: "smooth" });
+                    setSelectedCategory("All");
+                    setSearchQuery("");
+                    setSemanticSearchResults(null);
+                    const elem = document.getElementById("just-for-you-anchor");
+                    if (elem) elem.scrollIntoView({ behavior: "smooth" });
                   }}
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-rose-950"
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80"
+                    src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80"
                     alt="Best Offers"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
@@ -1830,7 +1851,7 @@ export default function App() {
                       {lang === "bn" ? "সাউন্ড সিস্টেম ও এয়ারবাড" : "Sound systems"}
                     </p>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-300 pt-1 group-hover:translate-x-1 transition-transform">
-                      {lang === "bn" ? "অফার দেখুন ➔" : "Listen ➔"}
+                      {lang === "bn" ? "সব প্রোডাক্ট দেখুন ➔" : "View All ➔"}
                     </span>
                   </div>
                 </div>
@@ -1838,13 +1859,16 @@ export default function App() {
                 {/* 5. Fast Delivery Across BD */}
                 <div
                   onClick={() => {
-                    setSelectedCategory("সব প্রডাক্ট");
-                    window.scrollTo({ top: 700, behavior: "smooth" });
+                    setSelectedCategory("All");
+                    setSearchQuery("");
+                    setSemanticSearchResults(null);
+                    const elem = document.getElementById("just-for-you-anchor");
+                    if (elem) elem.scrollIntoView({ behavior: "smooth" });
                   }}
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-amber-950"
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=600&q=80"
+                    src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80"
                     alt="Fast Delivery"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
@@ -1865,7 +1889,7 @@ export default function App() {
                       {lang === "bn" ? "সারাদেশে ক্যাশ অন ডেলিভারি" : "Cash on delivery BD"}
                     </p>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 pt-1 group-hover:translate-x-1 transition-transform">
-                      {lang === "bn" ? "ব্রাউজ করুন ➔" : "Browse ➔"}
+                      {lang === "bn" ? "সব প্রোডাক্ট দেখুন ➔" : "Browse All ➔"}
                     </span>
                   </div>
                 </div>
@@ -1873,13 +1897,16 @@ export default function App() {
                 {/* 6. Top Brands */}
                 <div
                   onClick={() => {
-                    setSelectedCategory("সব প্রডাক্ট");
-                    window.scrollTo({ top: 700, behavior: "smooth" });
+                    setSelectedCategory("All");
+                    setSearchQuery("");
+                    setSemanticSearchResults(null);
+                    const elem = document.getElementById("just-for-you-anchor");
+                    if (elem) elem.scrollIntoView({ behavior: "smooth" });
                   }}
                   className="group relative h-[320px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between bg-blue-950"
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=600&q=80"
+                    src="https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=800&q=80"
                     alt="Top Brands"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-90"
@@ -1900,7 +1927,7 @@ export default function App() {
                       {lang === "bn" ? "অফিসিয়াল ওয়ারেন্টি প্রডাক্ট" : "Laptops & Computing"}
                     </p>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-300 pt-1 group-hover:translate-x-1 transition-transform">
-                      {lang === "bn" ? "সব দেখুন ➔" : "View All ➔"}
+                      {lang === "bn" ? "সব প্রোডাক্ট দেখুন ➔" : "View All Products ➔"}
                     </span>
                   </div>
                 </div>
@@ -1913,7 +1940,7 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🔥</span>
                   <h3 className="text-base font-extrabold text-gray-900 tracking-tight">
-                    {lang === "bn" ? "সেরা ৫টি পপুলার প্রোডাক্ট (Top 5 Best Deals)" : "Top 5 Popular Products"}
+                    {lang === "bn" ? "ট্রেন্ডিং প্রোডাক্টস (Trending Products)" : "Trending Products"}
                   </h3>
                   <span className="text-[10px] font-black bg-indigo-50 text-[#3730a3] px-2 py-0.5 rounded border border-indigo-100">
                     {lang === "bn" ? "ছবি ও দাম সহ" : "With Image & Price"}
@@ -2004,14 +2031,16 @@ export default function App() {
               {/* Channel 1: JOHURUL.BDShop Certified */}
               <div 
                 onClick={() => {
-                  setSelectedCategory("Electronics");
+                  setSelectedCategory("All");
+                  setSearchQuery("");
+                  setSemanticSearchResults(null);
                   const element = document.getElementById("just-for-you-anchor");
                   if (element) element.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="flex flex-col items-center text-indigo-900enter cursor-pointer group"
+                className="flex flex-col items-center text-center cursor-pointer group"
               >
-                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-900lue-600lue-600 flex items-center justify-center transition-all shadow-xs group-hover:scale-105">
-                  <span className="text-lg sm:text-indigo-900lue-600xl">🏢</span>
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] flex items-center justify-center transition-all shadow-xs group-hover:scale-105">
+                  <span className="text-lg sm:text-xl">🏢</span>
                 </div>
                 <span className="text-[10px] sm:text-xs font-bold text-gray-700 mt-2 group-hover:text-[#3730a3] transition-colors truncate w-full">
                   {lang === "bn" ? "সার্টিফাইড শপ" : "JOHURUL.BDShop Certified"}
@@ -2023,10 +2052,10 @@ export default function App() {
                 onClick={() => {
                   alert(lang === "bn" ? "অভিনন্দন! দ্রুততম কুরিয়ার ডেলিভারি অফার সক্রিয় আছে।" : "Fast courier home delivery is active.");
                 }}
-                className="flex flex-col items-center text-indigo-900enter cursor-pointer group"
+                className="flex flex-col items-center text-center cursor-pointer group"
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] flex items-center justify-center transition-all shadow-xs group-hover:scale-105">
-                  <span className="text-lg sm:text-indigo-900lue-600xl">🚚</span>
+                  <span className="text-lg sm:text-xl">🚚</span>
                 </div>
                 <span className="text-[10px] sm:text-xs font-bold text-gray-700 mt-2 group-hover:text-[#3730a3] transition-colors truncate w-full">
                   {lang === "bn" ? "ক্যাশ অন ডেলিভারি" : "Cash on Delivery"}
@@ -2036,14 +2065,16 @@ export default function App() {
               {/* Channel 3: Audio Devices */}
               <div 
                 onClick={() => {
-                  setSelectedCategory("Electronics");
+                  setSelectedCategory("All");
+                  setSearchQuery("");
+                  setSemanticSearchResults(null);
                   const element = document.getElementById("just-for-you-anchor");
                   if (element) element.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="flex flex-col items-center text-indigo-900enter cursor-pointer group"
+                className="flex flex-col items-center text-center cursor-pointer group"
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gray-50 hover:bg-gray-100 text-gray-800 flex items-center justify-center transition-all shadow-xs group-hover:scale-105">
-                  <span className="text-lg sm:text-indigo-900lue-600xl">🎧</span>
+                  <span className="text-lg sm:text-xl">🎧</span>
                 </div>
                 <span className="text-[10px] sm:text-xs font-bold text-gray-700 mt-2 group-hover:text-[#3730a3] transition-colors truncate w-full">
                   {lang === "bn" ? "হেডফোন ও অডিও" : "Audio Gadgets"}
@@ -2056,10 +2087,10 @@ export default function App() {
                   setCouponCode("FB20");
                   alert(lang === "bn" ? "ভাউচার কোড 'FB20' যোগ করা হয়েছে! ২০% ডিসকাউন্ট পাবেন।" : "Applied Coupon 'FB20'! Check your checkout to save 20% on items.");
                 }}
-                className="flex flex-col items-center text-indigo-900enter cursor-pointer group"
+                className="flex flex-col items-center text-center cursor-pointer group"
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-indigo-50 hover:bg-indigo-100 text-[#3730a3] flex items-center justify-center transition-all shadow-xs group-hover:scale-105">
-                  <span className="text-lg sm:text-indigo-900lue-600xl">🎟️</span>
+                  <span className="text-lg sm:text-xl">🎟️</span>
                 </div>
                 <span className="text-[10px] sm:text-xs font-bold text-gray-700 mt-2 group-hover:text-[#3730a3] transition-colors truncate w-full">
                   {lang === "bn" ? "হট ভাউচার কোড" : "Hot Vouchers"}
@@ -2076,10 +2107,10 @@ export default function App() {
                     : `🎁 Congratulations! You shook and won: ${selectedPrize}!\nIt is applied to your active checkout session.`
                   );
                 }}
-                className="flex flex-col items-center text-indigo-900enter cursor-pointer group"
+                className="flex flex-col items-center text-center cursor-pointer group"
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-indigo-50 hover:bg-emerald-200 text-[#3730a3] flex items-center justify-center transition-all shadow-xs group-hover:scale-105 animate-bounce">
-                  <span className="text-lg sm:text-indigo-900lue-600xl">🎁</span>
+                  <span className="text-lg sm:text-xl">🎁</span>
                 </div>
                 <span className="text-[10px] sm:text-xs font-bold text-gray-700 mt-2 group-hover:text-[#3730a3] transition-colors truncate w-full">
                   {lang === "bn" ? "উপহার কুপন" : "Mystery Gift"}
@@ -2177,7 +2208,7 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3.5 sm:gap-4">
                     {filteredProducts.map((prod) => {
                       const isWishlisted = wishlist.includes(prod.id);
                       return (
@@ -2756,7 +2787,7 @@ export default function App() {
                     </span>
                     <span className="text-gray-800 font-bold">৳{deliveryCharge}</span>
                   </div>
-                  <div className="flex justify-between text-indigo-900lue-600ase font-black text-gray-900 pt-2 border-t border-gray-100">
+                  <div className="flex justify-between text-base font-black text-gray-900 pt-2 border-t border-gray-100">
                     <span>{lang === "bn" ? "সর্বমোট মূল্য" : "Payable Amount"}</span>
                     <span>৳{cartTotal}</span>
                   </div>
@@ -3245,7 +3276,7 @@ export default function App() {
 
       {/* Footer Branding */}
       <footer className="mt-auto bg-white border-t border-gray-100 py-8 text-center text-xs text-gray-400">
-        <div className="max-w-7xl mx-auto px-4 space-y-4">
+        <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 space-y-4">
           <p onClick={handleBrandClick} className="font-semibold text-gray-500 cursor-pointer select-none">
             © 2026 {lang === "bn" ? "জহুরুল বিডি-শপ ই-কমার্স" : "JOHURUL.BDShop Open Source E-Commerce System"}. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
           </p>
