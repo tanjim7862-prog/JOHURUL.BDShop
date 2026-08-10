@@ -5154,7 +5154,7 @@ export default function AdminPanel({
                     <div className="space-y-1.5 text-[11px] font-medium text-slate-600">
                       <div className="flex justify-between">
                         <span className="text-gray-400 font-semibold">{lang === "bn" ? "মডেল:" : "Model:"}</span>
-                        <span className="font-bold text-slate-900">gemini-3.5-flash</span>
+                        <span className="font-bold text-slate-900">gemini-2.5-flash</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 font-semibold">{lang === "bn" ? "ব্যবহার:" : "Usage:"}</span>

@@ -4,7 +4,7 @@ import {
   Copy, Globe, Sparkles, AlertCircle, RefreshCw, Heart, MessageCircle, 
   Share2, Play, Pause, Music, Flame, Star, Smartphone, Settings, 
   Tv, Volume2, VolumeX, BarChart3, ShieldCheck, DollarSign, Send, 
-  Layers, CheckCircle, ExternalLink, Calendar, Users, Eye, HelpCircle
+  Layers, CheckCircle, ExternalLink, Calendar, Users, Eye, HelpCircle, Download
 } from "lucide-react";
 
 interface TikTokAdPreviewProps {
@@ -33,6 +33,7 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
   const [isEditingId, setIsEditingId] = useState<boolean>(false);
   const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
   const [publishToast, setPublishToast] = useState<string | null>(null);
+  const [isDownloadingVideo, setIsDownloadingVideo] = useState<boolean>(false);
 
   // Real human-like TTS Voice States
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -491,7 +492,140 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
     return adCopy.substring(0, 160) + "...";
   };
 
-  // Auto copy payload to deep link publisher
+  // Generate and download 9:16 Vertical TikTok Video File (.webm / .mp4)
+  const generateAndDownloadVideo = async () => {
+    if (!selectedProduct) return;
+    setIsDownloadingVideo(true);
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 720;
+      canvas.height = 1280; // 9:16 TikTok Vertical Format
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context unavailable");
+
+      // Load Product Image
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = sceneImages[currentSlideIndex] || selectedProduct.image;
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+
+      // Stream canvas to MediaRecorder
+      const stream = canvas.captureStream(30);
+      let mimeType = "video/webm";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported("video/mp4")) {
+          mimeType = "video/mp4";
+        } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
+          mimeType = "video/webm;codecs=vp9";
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const chunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+        const blob = new Blob(chunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `tiktok_ad_${selectedProduct.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setIsDownloadingVideo(false);
+
+        const msg = lang === "bn"
+          ? "✅ ভিডিও ডাউনলোড সম্পন্ন! এবার টিকটকে সিলেক্ট করে পোস্ট করুন।"
+          : "✅ Video download completed! Select file on TikTok to upload.";
+        setPublishToast(msg);
+        setTimeout(() => setPublishToast(null), 5000);
+      };
+
+      mediaRecorder.start();
+
+      let frame = 0;
+      const totalFrames = 90; // ~3 seconds recording
+      const interval = setInterval(() => {
+        frame++;
+
+        // Canvas Background
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Animated product image zoom
+        if (img.complete && img.naturalWidth > 0) {
+          const scale = 1 + (frame / totalFrames) * 0.12;
+          const w = canvas.width * scale;
+          const h = canvas.height * scale;
+          const x = (canvas.width - w) / 2;
+          const y = (canvas.height - h) / 2;
+          ctx.drawImage(img, x, y, w, h);
+        }
+
+        // Dark gradient overlay
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "rgba(0,0,0,0.5)");
+        grad.addColorStop(0.6, "rgba(0,0,0,0.2)");
+        grad.addColorStop(1, "rgba(0,0,0,0.95)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Offer badge
+        ctx.fillStyle = "#e11d48";
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(30, 80, 220, 50, 25);
+        else ctx.rect(30, 80, 220, 50);
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText("⚡ 20% OFF TODAY", 45, 112);
+
+        // Caption box
+        ctx.fillStyle = "rgba(0,0,0,0.75)";
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(30, canvas.height - 250, canvas.width - 60, 110, 16);
+        else ctx.rect(30, canvas.height - 250, canvas.width - 60, 110);
+        ctx.fill();
+
+        ctx.fillStyle = "#facc15";
+        ctx.font = "bold 22px sans-serif";
+        const captionText = campaignLanguage === "bengali" 
+          ? slideScenes[currentSlideIndex]?.subtitleBn || selectedProduct.name
+          : slideScenes[currentSlideIndex]?.subtitleEn || selectedProduct.name;
+        ctx.fillText(captionText.substring(0, 42), 45, canvas.height - 185);
+
+        // Creator Handle and Price
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 26px sans-serif";
+        ctx.fillText(`${tiktokUsername}`, 45, canvas.height - 90);
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 22px sans-serif";
+        ctx.fillText(`৳${selectedProduct.price} - ${selectedProduct.name.substring(0, 28)}`, 45, canvas.height - 55);
+
+        if (frame >= totalFrames) {
+          clearInterval(interval);
+          mediaRecorder.stop();
+        }
+      }, 33);
+
+    } catch (err) {
+      console.error("Video export failed:", err);
+      setIsDownloadingVideo(false);
+    }
+  };
+
+  // Auto copy payload & trigger video download & deep link publisher
   const triggerTiktokDeepLinkPublish = () => {
     const postCaption = getCaptionOnly() || `${selectedProduct?.name} 🛒 ${selectedProduct ? "৳" + selectedProduct.price : ""}! Direct Link inside Bio! #tiktokmademebuyit #foryoupage #viral`;
     const fullPayload = `${postCaption}\n\n👉 Order Link: ${campaignLink}\n👤 Creator: ${tiktokUsername}`;
@@ -502,17 +636,21 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
       // Fallback
     }
 
+    // Trigger video download automatically
+    generateAndDownloadVideo();
+
     const toastMsg = lang === "bn" 
-      ? "📋 ক্যাপশন ও হ্যাশট্যাগ কপি হয়েছে! টিকটক আপলোড পেজ ওপেন হচ্ছে..." 
-      : "📋 Captions & Hashtags copied! Opening TikTok Upload page...";
+      ? "🎥 ভিডিও ফাইল সেভ হচ্ছে & ক্যাপশন কপি হয়েছে! টিকটক আপলোড পেজে ফাইলটি সিলেক্ট করুন।" 
+      : "🎥 Video downloading & Captions copied! Open TikTok Studio to upload.";
       
     setPublishToast(toastMsg);
-    setTimeout(() => setPublishToast(null), 4000);
-    
+    setTimeout(() => setPublishToast(null), 5000);
+
     // Open TikTok upload link
     setTimeout(() => {
       window.open(`https://www.tiktok.com/upload?caption=${encodeURIComponent(postCaption)}`, "_blank");
-    }, 300);
+      setShowGuideModal(true);
+    }, 500);
   };
 
   return (
@@ -891,6 +1029,40 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
           )}
         </button>
 
+        {/* PROMINENT TIKTOK POST & DOWNLOAD BUTTONS */}
+        <div className="pt-2 space-y-2">
+          <button
+            type="button"
+            onClick={generateAndDownloadVideo}
+            disabled={!selectedProduct || isDownloadingVideo}
+            className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-slate-700"
+          >
+            <Download className={`w-4 h-4 text-cyan-400 ${isDownloadingVideo ? "animate-bounce" : ""}`} />
+            <span>
+              {isDownloadingVideo 
+                ? (lang === "bn" ? "ভিডিও তৈরি ও ডাউনলোড হচ্ছে..." : "Downloading Video MP4...") 
+                : (lang === "bn" ? "📥 ভিডিও ফাইল ডাউনলোড করুন (.mp4)" : "📥 Download Video MP4 File")}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={triggerTiktokDeepLinkPublish}
+            disabled={!selectedProduct}
+            className="w-full bg-gradient-to-r from-rose-600 via-pink-600 to-cyan-500 hover:from-rose-500 hover:to-cyan-400 disabled:opacity-50 text-white font-black text-xs py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-rose-200 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+          >
+            <Send className="w-4 h-4 animate-bounce" />
+            <span>
+              {lang === "bn" ? "🚀 ১-ক্লিকে টিকটকে পোস্ট করুন (Post to TikTok)" : "🚀 1-Click Post to TikTok Now"}
+            </span>
+          </button>
+          <p className="text-[10px] text-gray-500 text-center mt-1 font-medium">
+            {lang === "bn"
+              ? "ভিডিও অটো-ডাউনলোড হবে, ক্যাপশন কপি হবে এবং টিকটক আপলোড পেজ ওপেন হবে"
+              : "Auto-downloads video, copies viral caption & opens tiktok.com/upload"}
+          </p>
+        </div>
+
         {/* Deep Link Bio Integration Card */}
         {selectedProduct && (
           <div className="pt-4 border-t border-gray-100 space-y-2">
@@ -1140,6 +1312,26 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
                   </a>
                 </div>
               </div>
+
+              {/* Direct Post Button under Phone Frame */}
+              <div className="mt-3 w-full bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 border border-cyan-500/40 rounded-2xl p-3 text-white flex items-center justify-between shadow-lg">
+                <div className="text-left">
+                  <span className="text-[9px] font-extrabold text-cyan-400 uppercase tracking-wider block">
+                    {lang === "bn" ? "✨ ভিডিও ও স্ক্রিপ্ট রেডি!" : "✨ Video & Script Ready!"}
+                  </span>
+                  <span className="text-xs font-black text-white">
+                    {lang === "bn" ? "১-ক্লিকে টিকটকে পোস্ট করুন" : "1-Click Post to TikTok"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={triggerTiktokDeepLinkPublish}
+                  className="bg-gradient-to-r from-cyan-400 to-rose-500 hover:from-cyan-300 hover:to-rose-400 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5 text-black" />
+                  <span>{lang === "bn" ? "পোস্ট করুন" : "Post Now"}</span>
+                </button>
+              </div>
             </div>
 
             {/* AI Voice Generator Controls and Audio Timeline on Right */}
@@ -1244,11 +1436,11 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
                 </p>
                 <button
                   onClick={triggerTiktokDeepLinkPublish}
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  className="w-full bg-gradient-to-r from-rose-600 via-pink-600 to-cyan-500 hover:from-rose-500 hover:to-cyan-400 text-white font-black text-xs py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all hover:scale-[1.01] active:scale-[0.99]"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  <Send className="w-4 h-4 text-white animate-bounce" />
                   <span>
-                    {lang === "bn" ? "ক্যাপশন কপি করে টিকটক ওপেন করুন" : "Copy Caption & Open TikTok Upload"}
+                    {lang === "bn" ? "🚀 ১-ক্লিকে টিকটকে পোস্ট করুন (Copy Caption & Open TikTok Upload)" : "🚀 1-Click Post to TikTok"}
                   </span>
                 </button>
               </div>
@@ -1544,26 +1736,35 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
               </div>
 
               {/* Step 2 */}
-              <div className="bg-cyan-50/60 border border-cyan-100 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center gap-2 text-cyan-900 font-black text-xs uppercase tracking-wider">
-                  <span className="w-5 h-5 rounded-full bg-cyan-600 text-white flex items-center justify-center text-[10px]">2</span>
-                  <span>{lang === "bn" ? "১-ক্লিকে সরাসরি টিকটকে পোস্ট করার নিয়ম" : "Step 2: 1-Click Direct TikTok Publishing"}</span>
+              <div className="bg-rose-50/70 border border-rose-100 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-rose-900 font-black text-xs uppercase tracking-wider">
+                  <span className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px]">2</span>
+                  <span>{lang === "bn" ? "🎥 টিকটক স্টুডিওতে আপলোড করার সহজ নিয়ম (Select Video Steps)" : "Step 2: Uploading Video on TikTok Studio"}</span>
                 </div>
-                <ul className="text-[11px] text-gray-600 pl-7 space-y-1.5 list-disc">
+                <ul className="text-[11px] text-gray-700 pl-7 space-y-2 list-decimal font-medium">
                   <li>
+                    <strong className="text-gray-900">{lang === "bn" ? "১. ভিডিও ডাউনলোড করুন:" : "1. Download Video:"}</strong>{" "}
                     {lang === "bn" 
-                      ? 'যেকোনো প্রোডাক্ট সিলেক্ট করে "এআই টিকটক ভিডিও স্ক্রিপ্ট জেনারেট করুন" চাপুন।' 
-                      : "Select any product and generate the AI Video & Script."}
+                      ? 'আমাদের অ্যাপের "📥 ভিডিও ডাউনলোড করুন" বাটনে ক্লিক করুন। আপনার প্রোডাক্টের প্রমোশনাল ভিডিও (.mp4) কম্পিউটারে/ফোনে সেভ হবে।' 
+                      : "Click 'Download Video MP4' button. The 9:16 ad video file will be saved to your device."}
                   </li>
                   <li>
+                    <strong className="text-gray-900">{lang === "bn" ? "২. টিকটক আপলোডে সিলেক্ট করুন:" : "2. Select Video on TikTok:"}</strong>{" "}
                     {lang === "bn"
-                      ? 'স্ক্রিপ্ট তৈরি হলে "ক্যাপশন কপি করে টিকটক ওপেন করুন" বাটনে ক্লিক করুন।'
-                      : "Click 'Copy Caption & Open TikTok Upload' button."}
+                      ? 'টিকটক স্টুডিওর স্ক্রিনে থাকা "Select video" বাটনে ক্লিক করে ডাউনলোডকৃত ভিডিও ফাইলটি সিলেক্ট করুন (বা ড্র্যাগ অ্যান্ড ড্রপ করুন)।'
+                      : 'On TikTok Studio, click the red "Select video" button or drag and drop the downloaded video file.'}
                   </li>
                   <li>
+                    <strong className="text-gray-900">{lang === "bn" ? "৩. ক্যাপশন পেস্ট করুন:" : "3. Paste Captions:"}</strong>{" "}
                     {lang === "bn"
-                      ? 'প্রোডাক্টের ভাইরাল ক্যাপশন, ডিসকাউন্ট অফার ও হ্যাশট্যাগ (#tiktokmademebuyit) অটোমেটিক কপি হয়ে যাবে এবং টিকটকের আপলোড পেজ (tiktok.com/upload) ওপেন হবে।'
-                      : "Viral captions, pricing, and hashtags (#tiktokmademebuyit) will automatically copy to your clipboard and open tiktok.com/upload."}
+                      ? 'ক্যাপশন বক্সে মাউসের রাইট ক্লিক করে Paste করুন (বা Ctrl+V চাপুন)। সমস্ত তথ্য, প্রাইস ও হ্যাশট্যাগ অটোমেটিক পেস্ট হয়ে যাবে!'
+                      : 'Right click and Paste (or press Ctrl+V) in the Caption box. All pricing, offers, and hashtags will paste automatically!'}
+                  </li>
+                  <li>
+                    <strong className="text-gray-900">{lang === "bn" ? "৪. পোস্ট বা ড্রাফট করুন:" : "4. Save as Draft or Post:"}</strong>{" "}
+                    {lang === "bn"
+                      ? 'পছন্দমতো Post বা Draft এ ক্লিক করে পোস্টটি সম্পন্ন করুন!'
+                      : 'Click Post or Save as Draft to complete your TikTok post!'}
                   </li>
                 </ul>
               </div>
