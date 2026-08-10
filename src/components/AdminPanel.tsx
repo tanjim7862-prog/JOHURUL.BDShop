@@ -798,21 +798,21 @@ export default function AdminPanel({
     <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50/50 rounded-3xl border border-gray-150 overflow-hidden shadow-sm -mx-4 sm:-mx-6 -my-6">
       
       {/* MOBILE HEADER BAR */}
-      <div className="lg:hidden bg-[#0f172a] text-white p-4 flex items-center justify-between border-b border-gray-800 shrink-0">
+      <div className="lg:hidden bg-white text-gray-900 p-4 flex items-center justify-between border-b border-gray-200 shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
           <button 
             type="button"
             onClick={() => setIsSidebarOpenMobile(!isSidebarOpenMobile)}
-            className="p-1 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1 text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer"
           >
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center">
-            <span className="bg-[#2563eb] text-white font-black text-xs px-2 py-1 rounded-md mr-1.5 shadow-sm">JB</span>
-            <span className="font-extrabold text-sm tracking-tight text-white">Johurul BDShop</span>
+            <span className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-black text-xs px-2 py-1 rounded-md mr-1.5 shadow-xs">JB</span>
+            <span className="font-extrabold text-sm tracking-tight text-gray-900">Johurul BDShop</span>
           </div>
         </div>
-        <div className="bg-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded border border-slate-700">
+        <div className="bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-indigo-100 shadow-2xs">
           {lang === "bn" ? "অ্যাডমিন" : "Admin"}
         </div>
       </div>
@@ -821,19 +821,19 @@ export default function AdminPanel({
       {isSidebarOpenMobile && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300 animate-fade-in"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-300 animate-fade-in"
             onClick={() => setIsSidebarOpenMobile(false)}
           />
-          <div className="relative flex flex-col w-72 max-w-xs bg-[#0f172a] text-slate-300 h-full shadow-2xl z-10 p-5 overflow-y-auto">
-            <div className="flex items-center justify-between pb-5 border-b border-slate-800 mb-5">
+          <div className="relative flex flex-col w-72 max-w-xs bg-white text-gray-800 h-full shadow-2xl z-10 p-5 overflow-y-auto border-r border-gray-100 animate-slide-in-left">
+            <div className="flex items-center justify-between pb-5 border-b border-gray-100 mb-5">
               <div className="flex items-center">
-                <span className="bg-[#2563eb] text-white font-black text-sm px-2.5 py-1.5 rounded-lg mr-2 shadow-sm">JB</span>
-                <span className="font-extrabold text-base tracking-tight text-white">Johurul BDShop</span>
+                <span className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-black text-sm px-2.5 py-1.5 rounded-xl mr-2 shadow-md shadow-indigo-100">JB</span>
+                <span className="font-extrabold text-base tracking-tight text-gray-900">Johurul BDShop</span>
               </div>
               <button 
                 type="button"
                 onClick={() => setIsSidebarOpenMobile(false)}
-                className="p-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-lg cursor-pointer"
+                className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -851,18 +851,18 @@ export default function AdminPanel({
                       setActiveTab(item.id);
                       setIsSidebarOpenMobile(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
                       isActive 
-                        ? "bg-[#2563eb] text-white shadow-md shadow-blue-900/30 font-black border-l-4 border-white"
-                        : "hover:bg-slate-800/60 text-slate-300 hover:text-white"
+                        ? "bg-gradient-to-r from-[#3730a3] to-indigo-600 text-white shadow-md shadow-indigo-200 font-extrabold translate-x-1 border-l-4 border-indigo-300"
+                        : "hover:bg-indigo-50/80 text-gray-600 hover:text-indigo-900 hover:translate-x-1"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <IconComp className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                      <IconComp className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isActive ? "text-white scale-110" : "text-gray-400"}`} />
                       <span>{lang === "bn" ? item.labelBn : item.labelEn}</span>
                     </div>
                     {item.count && item.count > 0 ? (
-                      <span className="bg-red-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full shrink-0">
+                      <span className="bg-red-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shrink-0 shadow-xs animate-pulse">
                         {item.count}
                       </span>
                     ) : null}
@@ -871,7 +871,7 @@ export default function AdminPanel({
               })}
             </div>
             
-            <div className="pt-4 border-t border-slate-800 mt-5 text-[10px] text-slate-500 text-center font-bold">
+            <div className="pt-4 border-t border-gray-100 mt-5 text-[10px] text-gray-400 text-center font-bold">
               Johurul BDShop v2.4.0
             </div>
           </div>
@@ -879,16 +879,16 @@ export default function AdminPanel({
       )}
 
       {/* DESKTOP SIDEBAR PANEL */}
-      <div className="hidden lg:flex flex-col w-64 bg-[#0f172a] text-slate-300 border-r border-slate-800 p-5 shrink-0 select-none">
-        <div className="flex items-center pb-5 border-b border-slate-800/80 mb-5">
-          <span className="bg-[#2563eb] text-white font-black text-sm px-2.5 py-1.5 rounded-lg mr-2 shadow-sm shrink-0">JB</span>
+      <div className="hidden lg:flex flex-col w-64 bg-white text-gray-800 border-r border-gray-200/80 p-5 shrink-0 select-none shadow-xs">
+        <div className="flex items-center pb-5 border-b border-gray-100 mb-5">
+          <span className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-black text-sm px-2.5 py-1.5 rounded-xl mr-2 shadow-md shadow-indigo-200 shrink-0">JB</span>
           <div className="min-w-0">
-            <h3 className="font-extrabold text-sm tracking-tight text-white truncate">Johurul BDShop</h3>
-            <span className="text-[10px] text-slate-500 font-extrabold tracking-wider uppercase block">Kamiab Prokashon Admin</span>
+            <h3 className="font-extrabold text-sm tracking-tight text-gray-900 truncate">Johurul BDShop</h3>
+            <span className="text-[10px] text-indigo-600/80 font-extrabold tracking-wider uppercase block">Kamiab Prokashon Admin</span>
           </div>
         </div>
 
-        <div className="space-y-1 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+        <div className="space-y-1.5 overflow-y-auto flex-1 pr-1 custom-scrollbar">
           {sidebarItems.map((item) => {
             const IconComp = item.icon;
             const isActive = activeTab === item.id;
@@ -897,18 +897,18 @@ export default function AdminPanel({
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[11px] font-bold transition-all duration-200 cursor-pointer ${
                   isActive 
-                    ? "bg-[#2563eb] text-white shadow-md shadow-blue-900/30 font-extrabold border-l-4 border-white"
-                    : "hover:bg-slate-800/60 text-slate-400 hover:text-slate-200"
+                    ? "bg-gradient-to-r from-[#3730a3] to-indigo-600 text-white shadow-md shadow-indigo-200 font-extrabold translate-x-1 border-l-4 border-indigo-300 scale-[1.01]"
+                    : "hover:bg-indigo-50/80 text-gray-600 hover:text-indigo-900 hover:translate-x-1.5 hover:shadow-2xs"
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <IconComp className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-500"}`} />
+                  <IconComp className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isActive ? "text-white scale-110" : "text-gray-400 group-hover:text-indigo-600"}`} />
                   <span className="truncate">{lang === "bn" ? item.labelBn : item.labelEn}</span>
                 </div>
                 {item.count && item.count > 0 ? (
-                  <span className="bg-red-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full shrink-0">
+                  <span className="bg-red-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shrink-0 shadow-xs animate-pulse">
                     {item.count}
                   </span>
                 ) : null}
@@ -917,11 +917,14 @@ export default function AdminPanel({
           })}
         </div>
 
-        <div className="pt-4 border-t border-slate-800 mt-5">
-          <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
+        <div className="pt-4 border-t border-gray-100 mt-5">
+          <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
             <span>Server Status</span>
-            <span className="text-emerald-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-emerald-600 flex items-center gap-1.5 font-black">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
               ONLINE
             </span>
           </div>
