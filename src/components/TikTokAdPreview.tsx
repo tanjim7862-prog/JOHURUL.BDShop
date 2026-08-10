@@ -31,6 +31,8 @@ export default function TikTokAdPreview({ products, lang }: TikTokAdPreviewProps
     return localStorage.getItem("tiktok_username") || "@tanjim.shop";
   });
   const [isEditingId, setIsEditingId] = useState<boolean>(false);
+  const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
+  const [publishToast, setPublishToast] = useState<string | null>(null);
 
   // Real human-like TTS Voice States
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -491,15 +493,26 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
 
   // Auto copy payload to deep link publisher
   const triggerTiktokDeepLinkPublish = () => {
-    const postCaption = getCaptionOnly() || `${selectedProduct?.name} 🛒 Direct Link inside Bio! #tiktokmademebuyit`;
-    const fullPayload = `${postCaption}\n\n👉 Store Link: ${campaignLink}`;
+    const postCaption = getCaptionOnly() || `${selectedProduct?.name} 🛒 ${selectedProduct ? "৳" + selectedProduct.price : ""}! Direct Link inside Bio! #tiktokmademebuyit #foryoupage #viral`;
+    const fullPayload = `${postCaption}\n\n👉 Order Link: ${campaignLink}\n👤 Creator: ${tiktokUsername}`;
     
-    navigator.clipboard.writeText(fullPayload);
+    try {
+      navigator.clipboard.writeText(fullPayload);
+    } catch {
+      // Fallback
+    }
+
+    const toastMsg = lang === "bn" 
+      ? "📋 ক্যাপশন ও হ্যাশট্যাগ কপি হয়েছে! টিকটক আপলোড পেজ ওপেন হচ্ছে..." 
+      : "📋 Captions & Hashtags copied! Opening TikTok Upload page...";
+      
+    setPublishToast(toastMsg);
+    setTimeout(() => setPublishToast(null), 4000);
     
     // Open TikTok upload link
     setTimeout(() => {
       window.open(`https://www.tiktok.com/upload?caption=${encodeURIComponent(postCaption)}`, "_blank");
-    }, 100);
+    }, 300);
   };
 
   return (
@@ -527,7 +540,7 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
         </div>
 
         {/* CONNECTED TIKTOK ID SETTINGS */}
-        <div className="bg-gradient-to-r from-cyan-900 via-slate-900 to-rose-950 p-4 rounded-2xl text-white shadow-xs">
+        <div className="bg-gradient-to-r from-cyan-900 via-slate-900 to-rose-950 p-4 rounded-2xl text-white shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
@@ -538,16 +551,27 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
                 {lang === "bn" ? "টিকটক আইডি কানেকশন" : "TikTok Creator ID Account"}
               </span>
             </div>
-            <button
-              onClick={() => setIsEditingId(!isEditingId)}
-              className="text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md transition-all font-bold cursor-pointer"
-            >
-              {isEditingId ? (lang === "bn" ? "বাতিল" : "Cancel") : (lang === "bn" ? "পরিবর্তন" : "Edit")}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(true)}
+                className="text-[10px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/30 px-2 py-1 rounded-md transition-all font-bold cursor-pointer flex items-center gap-1"
+              >
+                <HelpCircle className="w-3 h-3 text-cyan-300" />
+                {lang === "bn" ? "পোস্টিং গাইড" : "Posting Guide"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingId(!isEditingId)}
+                className="text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md transition-all font-bold cursor-pointer"
+              >
+                {isEditingId ? (lang === "bn" ? "বাতিল" : "Cancel") : (lang === "bn" ? "পরিবর্তন" : "Edit")}
+              </button>
+            </div>
           </div>
 
           {isEditingId ? (
-            <div className="mt-3 flex gap-2">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={tiktokUsername}
@@ -556,6 +580,7 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
                 className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-cyan-400 font-mono"
               />
               <button
+                type="button"
                 onClick={handleSaveTiktokUsername}
                 className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs px-3 py-1.5 rounded-xl transition-all cursor-pointer"
               >
@@ -563,7 +588,7 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
               </button>
             </div>
           ) : (
-            <div className="mt-2.5 flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <span className="font-mono text-sm font-black text-white">{tiktokUsername}</span>
                 <p className="text-[10px] text-gray-300">
@@ -1464,6 +1489,115 @@ Can't believe I waited this long to get the "${productName}"! 😍 Game changer 
         )}
 
       </div>
+
+      {/* FLOATING TOAST NOTIFICATION */}
+      {publishToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-cyan-400/40 flex items-center gap-3 animate-slide-in-up text-xs font-bold">
+          <Sparkles className="w-4 h-4 text-cyan-400 animate-spin" />
+          <span>{publishToast}</span>
+        </div>
+      )}
+
+      {/* TIKTOK POSTING INSTRUCTIONS GUIDE MODAL */}
+      {showGuideModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto space-y-6 text-left relative animate-scale-up">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-black text-cyan-400 font-black text-xl flex items-center justify-center shadow-md">
+                  𝅘𝅥𝅮
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">
+                    🚀 {lang === "bn" ? "টিকটক অ্যাকাউন্ট থেকে পোস্ট করার নির্দেশিকা" : "TikTok Direct Posting Guide"}
+                  </h3>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    {lang === "bn" ? "কীভাবে ১-ক্লিকে টিকটকে পোস্ট করবেন" : "Step-by-step account connection & 1-click publish"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center font-bold transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Guide Steps */}
+            <div className="space-y-4 text-xs text-gray-700 leading-relaxed">
+              
+              {/* Step 1 */}
+              <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-indigo-900 font-black text-xs uppercase tracking-wider">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
+                  <span>{lang === "bn" ? "টিকটক আইডি লিঙ্ক করা (TikTok Creator ID Connection)" : "Step 1: Link Your TikTok Account"}</span>
+                </div>
+                <p className="text-[11px] text-gray-600 pl-7">
+                  {lang === "bn"
+                    ? 'অ্যাড মেকার ট্যাবে গেলে "টিকটক আইডি কানেকশন (TikTok Creator ID Account)" অপশন দেখতে পাবেন। সেখানে Edit / পরিবর্তন বাটনে ক্লিক করে আপনার টিকটক ইউজারনেম (যেমন: @yourusername) লিখে Save করে দিন।'
+                    : "Go to the Ad Creator tab, click Edit under 'TikTok Creator ID Account', enter your username (e.g. @yourusername), and click Save."}
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="bg-cyan-50/60 border border-cyan-100 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-cyan-900 font-black text-xs uppercase tracking-wider">
+                  <span className="w-5 h-5 rounded-full bg-cyan-600 text-white flex items-center justify-center text-[10px]">2</span>
+                  <span>{lang === "bn" ? "১-ক্লিকে সরাসরি টিকটকে পোস্ট করার নিয়ম" : "Step 2: 1-Click Direct TikTok Publishing"}</span>
+                </div>
+                <ul className="text-[11px] text-gray-600 pl-7 space-y-1.5 list-disc">
+                  <li>
+                    {lang === "bn" 
+                      ? 'যেকোনো প্রোডাক্ট সিলেক্ট করে "এআই টিকটক ভিডিও স্ক্রিপ্ট জেনারেট করুন" চাপুন।' 
+                      : "Select any product and generate the AI Video & Script."}
+                  </li>
+                  <li>
+                    {lang === "bn"
+                      ? 'স্ক্রিপ্ট তৈরি হলে "ক্যাপশন কপি করে টিকটক ওপেন করুন" বাটনে ক্লিক করুন।'
+                      : "Click 'Copy Caption & Open TikTok Upload' button."}
+                  </li>
+                  <li>
+                    {lang === "bn"
+                      ? 'প্রোডাক্টের ভাইরাল ক্যাপশন, ডিসকাউন্ট অফার ও হ্যাশট্যাগ (#tiktokmademebuyit) অটোমেটিক কপি হয়ে যাবে এবং টিকটকের আপলোড পেজ (tiktok.com/upload) ওপেন হবে।'
+                      : "Viral captions, pricing, and hashtags (#tiktokmademebuyit) will automatically copy to your clipboard and open tiktok.com/upload."}
+                  </li>
+                </ul>
+              </div>
+
+              {/* Step 3 API Note */}
+              <div className="bg-slate-900 text-slate-200 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
+                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                  <span>{lang === "bn" ? "💡 ব্যাকগ্রাউন্ড অটো-পোস্টিং ও টিকটক API সংক্রান্ত তথ্য" : "TikTok API & Web Share Info"}</span>
+                </div>
+                <p className="text-[10px] text-slate-300 leading-relaxed pl-6">
+                  {lang === "bn"
+                    ? "কোনো ব্রাউজার ইন্টারঅ্যাকশন ছাড়া ১-ক্লিক অটো-পাবলিশিংয়ের জন্য টিকটকের অফিশিয়াল TikTok Content Posting API (TikTok Developer OAuth) প্রয়োজন হয়। আমাদের সিস্টেমে TikTok Web Share Integration প্রস্তুত রাখা আছে, যার মাধ্যমে আপনার টিকটক আইডি সেভ রেখে কয়েক সেকেন্ডেই কন্টেন্ট শেয়ার ও পোস্ট করতে পারবেন!"
+                    : "For direct background posting, TikTok Content Posting API OAuth is used. Our platform supports TikTok Web Share Integration to easily copy viral captions and deep-link directly into TikTok Upload with 1-click!"}
+                </p>
+              </div>
+
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-6 rounded-xl transition-all cursor-pointer shadow-md"
+              >
+                {lang === "bn" ? "ঠিক আছে, বুঝেছি" : "Got it!"}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
